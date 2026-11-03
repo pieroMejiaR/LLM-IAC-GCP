@@ -1,0 +1,28 @@
+[project]
+name = "agente-iac-gcp"
+version = "0.1.0"
+description = "Agente LLM que genera y valida Terraform para Google Cloud Platform"
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2.7",
+  "pyyaml>=6.0",
+  "typer>=0.12",
+  "litellm>=1.50",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["agent*", "grounding*", "sandbox*"]
+
+[tool.setuptools.package-data]
+agent = ["prompts/*.md"]
+grounding = ["catalog.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

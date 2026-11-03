@@ -1,0 +1,52 @@
+# Catálogo de servicios en alcance (6). Cada servicio indica sus tipos de recurso
+# de Terraform y notas que se inyectan en el prompt de generación (grounding).
+# Los tipos listados aquí son también la lista de recursos permitidos en modo despliegue.
+version: 1
+servicios:
+  cloud_run:
+    descripcion: Servicio de contenedores sin servidor (Cloud Run v2) para APIs y aplicaciones web.
+    recursos: [google_cloud_run_v2_service]
+    si_publico: [google_cloud_run_v2_service_iam_member]
+    notas:
+      - Usar google_cloud_run_v2_service; no usar el recurso v1 google_cloud_run_service.
+      - Para acceso público, google_cloud_run_v2_service_iam_member con role "roles/run.invoker" y member "allUsers".
+      - La imagen del contenedor se recibe por la variable container_image, con valor por defecto "us-docker.pkg.dev/cloudrun/container/hello"; no construir imágenes.
+      - Exportar la URL del servicio en outputs.tf con el nombre service_url.
+  cloud_sql_postgres:
+    descripcion: Base de datos administrada PostgreSQL (Cloud SQL).
+    recursos: [google_sql_database_instance, google_sql_database, google_sql_user]
+    si_privado: [google_compute_global_address, google_service_networking_connection]
+    requiere_si_privado: [vpc]
+    notas:
+      - Usar la versión POSTGRES_16 y el tier más pequeño (db-f1-micro) salvo que el requerimiento pida otro.
+      - Definir deletion_protection = false para permitir terraform destroy en las pruebas.
+      - Con IP privada, ipv4_enabled = false, private_network apuntando a la VPC y depends_on a google_service_networking_connection.
+      - La contraseña del usuario viene de una variable con sensitive = true.
+  cloud_storage:
+    descripcion: Almacenamiento de objetos (buckets de Cloud Storage), incluido el hospedaje de sitios estáticos.
+    recursos: [google_storage_bucket]
+    si_publico: [google_storage_bucket_iam_member]
+    notas:
+      - Activar uniform_bucket_level_access = true.
+      - Si no es público, public_access_prevention = "enforced".
+      - Si es público, google_storage_bucket_iam_member con role "roles/storage.objectViewer" y member "allUsers".
+      - Definir force_destroy = true para permitir terraform destroy en las pruebas.
+      - El nombre del bucket debe ser único globalmente; construirlo con var.project_id como prefijo.
+  vpc:
+    descripcion: Red privada virtual con subred y reglas de firewall.
+    recursos: [google_compute_network, google_compute_subnetwork, google_compute_firewall]
+    notas:
+      - Definir auto_create_subnetworks = false y crear la subred explícitamente.
+      - No abrir SSH (22) ni RDP (3389) a 0.0.0.0/0.
+  secret_manager:
+    descripcion: Almacenamiento de secretos (Secret Manager).
+    recursos: [google_secret_manager_secret, google_secret_manager_secret_version]
+    notas:
+      - Usar replication { auto {} }.
+      - El valor del secreto viene de una variable con sensitive = true; nunca escribirlo en el código.
+  iam:
+    descripcion: Cuentas de servicio y permisos (IAM) con mínimo privilegio.
+    recursos: [google_service_account, google_project_iam_member]
+    notas:
+      - No asignar roles/owner ni roles/editor; usar roles específicos.
+      - Asociar la cuenta de servicio a los servicios que la usan (por ejemplo, service_account en Cloud Run).

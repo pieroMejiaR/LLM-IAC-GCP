@@ -1,0 +1,16 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Terraform: el estado contiene valores sensibles
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+.terraform.lock.hcl.bak
+
+# Resultados locales (se suben solo los consolidados del experimento)
+resultados/
+grounding/esquema_completo.json

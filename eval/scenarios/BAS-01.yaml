@@ -1,0 +1,20 @@
+# Escenario de ejemplo (formato del Anexo A). Gabriel redacta los 12 definitivos y los 3 de piloto.
+id: BAS-01
+nivel: basico
+titulo: Sitio estático público
+requerimiento: >
+  Somos una startup que necesita publicar la página web estática de nuestro
+  producto (HTML, CSS e imágenes). Debe ser accesible desde internet y lo más
+  barata posible. Región: Santiago de Chile.
+contexto:
+  region: southamerica-west1
+  entornos: [dev]
+servicios_esperados:
+  - google_storage_bucket
+  - google_storage_bucket_iam_member
+restricciones:
+  - el bucket permite lectura pública solo de objetos
+checklist:
+  - Existe un bucket en southamerica-west1 con acceso uniforme
+  - Los objetos son legibles por allUsers con roles/storage.objectViewer
+  - El bucket se puede destruir aunque tenga objetos (force_destroy)

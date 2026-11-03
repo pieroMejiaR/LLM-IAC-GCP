@@ -1,0 +1,26 @@
+# Plantilla del caso que se despliega de verdad. Completar cuando el equipo elija la aplicación.
+# Antes de desplegar: construir y publicar la imagen del contenedor y poner su URL en contexto.container_image.
+id: REAL-01
+nivel: caso_real
+titulo: Aplicación web del caso real (por definir)
+requerimiento: >
+  Necesitamos desplegar nuestra aplicación web en Google Cloud. La aplicación
+  corre en un contenedor que escucha en el puerto 8080 y debe ser accesible
+  públicamente por HTTPS. Debe usar una cuenta de servicio propia con permisos
+  mínimos. Región: Santiago de Chile. Debe ser lo más barata posible.
+  (Agregar aquí la base de datos, el almacenamiento o los secretos si la aplicación los necesita.)
+contexto:
+  region: southamerica-west1
+  entornos: [dev]
+  container_image: REEMPLAZAR-por-la-URL-de-la-imagen   # p. ej. southamerica-west1-docker.pkg.dev/PROYECTO/repo/app:v1
+  puerto: 8080
+servicios_esperados:
+  - google_cloud_run_v2_service
+  - google_cloud_run_v2_service_iam_member
+  - google_service_account
+restricciones:
+  - el servicio responde por HTTPS con código 200 en la ruta raíz
+checklist:
+  - Cloud Run usa la imagen indicada y la cuenta de servicio propia
+  - El servicio es invocable por allUsers
+  - La salida service_url devuelve 200
