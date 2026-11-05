@@ -31,6 +31,17 @@ python -m agent destruir resultados/despliegue/REAL-01/T1-<run_id>/despliegue
 
 Cada corrida deja en `resultados/<escenario>/<tratamiento>-<run_id>/` los archivos `.tf` y `resultado.json` con la traza completa (llamadas al LLM, tokens, costo, intentos y errores). `ResultadoCorrida.fila_csv()` devuelve la fila del Anexo C.
 
+### Lote del experimento
+
+`eval/run_batch.py` corre todos los escenarios de `eval/scenarios/` con T0 y T1, 3 repeticiones cada uno (72 corridas), en orden aleatorio con semilla fija. Cada corrida agrega su fila a `resultados/runs.csv` apenas termina y guarda sus archivos como `agent generar`. Si el lote se corta, `--reanudar` salta las corridas que ya están en el CSV.
+
+```bash
+python -m eval.run_batch --solo-orden     # muestra el orden sin llamar al LLM
+python -m eval.run_batch                  # lote completo; --solo BAS-01 --repeticiones 1 para una prueba corta
+python -m eval.run_batch --reanudar
+docker compose run --rm --entrypoint python agente -m eval.run_batch
+```
+
 ## Sandbox en Docker
 
 Es la forma de correr el experimento y el despliegue. Requiere Docker con Compose v2 y haber ejecutado `gcloud auth application-default login`. En Windows la credencial se encuentra sola; en Linux o macOS se indica con `ADC_HOST` en `.env`.
