@@ -1,7 +1,8 @@
-"""Evidencia de las pruebas S5 y S6 y de las versiones del sandbox (sección 4.1 y tabla 5.8).
+"""Evidencia de las pruebas S5 y S6, versiones del sandbox y diagnóstico del entorno.
 
 Se corre dentro del contenedor del agente:
 
+    docker compose run --rm --entrypoint python agente -m sandbox.pruebas_seguridad diagnostico
     docker compose run --rm --entrypoint python agente -m sandbox.pruebas_seguridad s6
     docker compose run --rm --entrypoint python agente -m sandbox.pruebas_seguridad s5
     docker compose run --rm --entrypoint python agente -m sandbox.pruebas_seguridad versiones
@@ -54,11 +55,16 @@ class Registro:
         print(texto, flush=True)
         self.lineas.append(texto)
 
-    def comprobar(self, descripcion: str, esperado: str, obtenido: str, ok: bool) -> None:
-        self.resultados.append(ok)
-        self.escribir(f"[{'OK' if ok else 'FALLA'}] {descripcion}")
+    def comprobar(self, descripcion: str, esperado: str, obtenido: str, ok: bool, *, aviso: bool = False,
+                  ayuda: str = "") -> None:
+        """aviso=True: si no se cumple se informa, pero no cuenta como falla."""
+        if not aviso:
+            self.resultados.append(ok)
+        self.escribir(f"[{'OK' if ok else ('AVISO' if aviso else 'FALLA')}] {descripcion}")
         self.escribir(f"       esperado: {esperado}")
         self.escribir(f"       obtenido: {obtenido}")
+        if ayuda and not ok:
+            self.escribir(f"       qué hacer: {ayuda}")
 
     def cerrar(self) -> int:
         bien = sum(self.resultados)
@@ -226,8 +232,116 @@ def versiones() -> int:
     return reg.cerrar()
 
 
+# --------------------------------------------------------------------------- diagnóstico
+
+_PLANTILLA_DIAGNOSTICO = (
+    'terraform {\n  required_providers {\n    google = { source = "hashicorp/google" }\n  }\n}\n\n'
+    'variable "project_id" {\n  type = string\n}\n\nvariable "region" {\n  type = string\n}\n\n'
+    'provider "google" {\n  project = var.project_id\n  region  = var.region\n}\n\n'
+    'data "google_project" "p" {}\n\noutput "numero" {\n  value = data.google_project.p.number\n}\n'
+)
+_AYUDAS_GCP = [
+    ("could not find default credentials", "ejecute `gcloud auth application-default login` en el equipo"),
+    ("getaccesstoken", "la cuenta que inició sesión necesita roles/iam.serviceAccountTokenCreator sobre la cuenta suplantada"),
+    ("has not been used in project", "habilite en el proyecto la API que indica el mensaje"),
+    ("invalid_grant", "la sesión de gcloud venció: repita `gcloud auth application-default login`"),
+    ("403", "la cuenta suplantada no tiene permiso de lectura en el proyecto (rol Viewer)"),
+]
+
+
+def _ayuda_gcp(salida: str) -> str:
+    s = salida.lower()
+    return next((a for clave, a in _AYUDAS_GCP if clave in s), "revise el mensaje de error")
+
+
+def _probar_cuenta(reg: Registro, cfg: Config, cuenta: str, etiqueta: str, *, aviso: bool = False) -> None:
+    env = _entorno_base(cfg.proyecto_gcp, cfg.region, cuenta)
+    with tempfile.TemporaryDirectory(prefix="diag-") as tmp:
+        d = Path(tmp)
+        (d / "main.tf").write_text(_PLANTILLA_DIAGNOSTICO, encoding="utf-8")
+        p = _terraform(["init", "-input=false", "-no-color"], d, env)
+        if p.returncode == 0:
+            p = _terraform(["plan", "-input=false", "-lock=false", "-no-color"], d, env)
+        salida = p.stdout + p.stderr
+        reg.comprobar(f"terraform plan suplantando la {etiqueta} ({cuenta})",
+                      "lee el proyecto (credencial, suplantación y API funcionan)",
+                      "correcto" if p.returncode == 0 else f"código {p.returncode}. {_resumen(salida, 3)}",
+                      p.returncode == 0, aviso=aviso, ayuda=_ayuda_gcp(salida))
+
+
+def diagnostico() -> int:
+    """Revisa el entorno antes de S5, de la corrida del experimento o del despliegue. No muestra secretos."""
+    cfg = Config.desde_entorno()
+    reg = Registro("diagnostico", "Diagnóstico del entorno del sandbox")
+
+    clave = os.environ.get("GEMINI_API_KEY", "")
+    reg.comprobar("GEMINI_API_KEY", "definida", f"definida ({len(clave)} caracteres)" if clave else "vacía",
+                  bool(clave), ayuda="complete GEMINI_API_KEY en .env")
+    for nombre, valor, obligatoria in [("AGENT_MODELO", cfg.modelo, True), ("GCP_PROYECTO", cfg.proyecto_gcp, True),
+                                       ("GCP_REGION", cfg.region, True),
+                                       ("GCP_CUENTA_EVALUACION", cfg.cuenta_evaluacion, True),
+                                       ("GCP_CUENTA_DESPLIEGUE", cfg.cuenta_despliegue, False)]:
+        reg.comprobar(nombre, "definida", valor or "vacía", bool(valor), aviso=not obligatoria,
+                      ayuda=f"complete {nombre} en .env" + ("" if obligatoria else " (solo para el modo despliegue)"))
+
+    ruta = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
+    try:
+        if not ruta:
+            raise FileNotFoundError("GOOGLE_APPLICATION_CREDENTIALS no está definida")
+        tipo = json.loads(Path(ruta).read_text(encoding="utf-8")).get("type", "?")
+        obtenido, ok = f"archivo legible, tipo {tipo}", tipo in ("authorized_user", "service_account",
+                                                                 "impersonated_service_account", "external_account")
+    except (OSError, ValueError) as e:
+        obtenido, ok = f"no se pudo leer ({e if not ruta else type(e).__name__})", False
+    reg.comprobar(f"Credencial de gcloud montada en {ruta or '(sin GOOGLE_APPLICATION_CREDENTIALS)'}",
+                  "archivo de application_default_credentials", obtenido, ok,
+                  ayuda="ejecute `gcloud auth application-default login` (en Linux o macOS, defina ADC_HOST en .env)")
+    reg.escribir()
+
+    obtenido, codigo = _https("https://www.googleapis.com/discovery/v1/apis?name=storage&fields=kind")
+    reg.comprobar("Salida a las APIs de Google por el proxy", "responde el destino", obtenido, codigo is not None,
+                  ayuda="levante el proxy con `docker compose up -d proxy` y revise `docker compose logs proxy`")
+
+    if clave:
+        modelo = cfg.modelo.split("/", 1)[-1]
+        req = urllib.request.Request(f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}",
+                                     headers={"x-goog-api-key": clave})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                obtenido, ok = f"HTTP {r.status}: el modelo existe y la clave es válida", True
+        except urllib.error.HTTPError as e:
+            motivo = {400: "clave inválida", 403: "clave sin permiso", 404: "el modelo no existe"}.get(e.code, "")
+            obtenido, ok = f"HTTP {e.code} {motivo}".strip(), False
+        except OSError as e:   # incluye URLError: sin respuesta del destino
+            obtenido, ok = f"sin respuesta: {getattr(e, 'reason', e)}", False
+        reg.comprobar(f"Gemini: modelo {modelo}", "HTTP 200", obtenido, ok,
+                      ayuda="revise GEMINI_API_KEY y AGENT_MODELO en .env")
+    reg.escribir()
+
+    if cfg.proyecto_gcp and cfg.cuenta_evaluacion:
+        _probar_cuenta(reg, cfg, cfg.cuenta_evaluacion, "cuenta de evaluación (Viewer)")
+    if cfg.proyecto_gcp and cfg.cuenta_despliegue:
+        _probar_cuenta(reg, cfg, cfg.cuenta_despliegue, "cuenta de despliegue", aviso=True)
+    reg.escribir()
+
+    # Tiempo de una validación completa sin plan, para estimar la duración de la corrida.
+    referencia = Path("tests/datos/caso_real")
+    if referencia.exists():
+        from sandbox.local_runner import ValidadorLocal
+        archivos = {p.name: p.read_text(encoding="utf-8") for p in sorted(referencia.glob("*.tf"))}
+        v = ValidadorLocal(None, cfg.region, None, checkov_bloqueantes=set(cfg.checkov_bloqueantes),
+                           tflint_config=cfg.tflint_config, ejecutar_plan=False)
+        res = v.validar(archivos)
+        tiempos = ", ".join(f"{c.control} {c.duracion_s:.1f}s" for c in res.controles if not c.omitido)
+        total = sum(c.duracion_s for c in res.controles)
+        reg.comprobar("Validación de referencia (caso real, sin plan)", "pasan todos los controles",
+                      f"{'correcto' if res.ok else 'falla en ' + res.primer_fallo.control}: {tiempos}; total {total:.1f}s",
+                      res.ok)
+    return reg.cerrar()
+
+
 def main(argv: list[str]) -> int:
-    comandos = {"s5": s5, "s6": s6, "versiones": versiones}
+    comandos = {"diagnostico": diagnostico, "s5": s5, "s6": s6, "versiones": versiones}
     if len(argv) != 1 or argv[0] not in comandos:
         print(__doc__)
         return 2
