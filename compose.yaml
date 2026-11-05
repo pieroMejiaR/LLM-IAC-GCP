@@ -1,0 +1,118 @@
+# Sandbox del agente. Ver README, sección "Sandbox en Docker".
+#
+#   docker compose build
+#   docker compose run --rm pruebas                                    # pytest dentro del contenedor
+#   docker compose run --rm agente generar eval/scenarios/BAS-01.yaml  # modo evaluación
+#   docker compose run --rm despliegue desplegar casos/caso_real.yaml  # modo despliegue
+#
+# Red: el agente está en una red interna de Docker, sin ruta a internet. Su única salida
+# es el proxy, que solo abre túneles HTTPS hacia los dominios de sandbox/proxy/permitidos_*.txt.
+name: agente-iac-gcp
+
+x-restricciones: &restricciones
+  image: agente-iac-gcp:local
+  build: .
+  read_only: true
+  tmpfs:
+    - /tmp:size=2g,mode=1777
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 512
+  mem_limit: 4g
+  cpus: 2
+  volumes:
+    - ./resultados:/app/resultados
+    - ./eval:/app/eval:ro
+    - ./casos:/app/casos:ro
+
+x-proxy: &proxy
+  image: agente-iac-gcp-proxy:local
+  build: sandbox/proxy
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  healthcheck:
+    test: ["CMD", "nc", "-z", "127.0.0.1", "3128"]
+    interval: 2s
+    timeout: 2s
+    retries: 15
+
+x-salida-evaluacion: &salida-evaluacion
+  HTTPS_PROXY: http://proxy:3128
+  https_proxy: http://proxy:3128
+  HTTP_PROXY: http://proxy:3128
+  http_proxy: http://proxy:3128
+  NO_PROXY: localhost,127.0.0.1
+  no_proxy: localhost,127.0.0.1
+
+services:
+  proxy:
+    <<: *proxy
+    volumes:
+      - ./sandbox/proxy/permitidos_evaluacion.txt:/etc/squid/permitidos.txt:ro
+    networks: [sandbox, salida]
+
+  # Modo evaluación (experimento T0/T1). Nunca despliega; plan usa la cuenta Viewer.
+  agente:
+    <<: *restricciones
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *salida-evaluacion
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/adc
+    secrets: [adc]
+    networks: [sandbox]
+    depends_on:
+      proxy:
+        condition: service_healthy
+
+  # Pruebas automáticas y evidencia de red: misma imagen y misma red, sin credenciales ni .env.
+  pruebas:
+    <<: *restricciones
+    environment:
+      <<: *salida-evaluacion
+    entrypoint: ["pytest", "-v", "-p", "no:cacheprovider"]
+    networks: [sandbox]
+    depends_on:
+      proxy:
+        condition: service_healthy
+
+  proxy-despliegue:
+    <<: *proxy
+    volumes:
+      - ./sandbox/proxy/permitidos_despliegue.txt:/etc/squid/permitidos.txt:ro
+    networks: [sandbox-despliegue, salida]
+
+  # Modo despliegue (caso real): pide el ID del proyecto antes de apply y de destroy.
+  despliegue:
+    <<: *restricciones
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      HTTPS_PROXY: http://proxy-despliegue:3128
+      https_proxy: http://proxy-despliegue:3128
+      HTTP_PROXY: http://proxy-despliegue:3128
+      http_proxy: http://proxy-despliegue:3128
+      NO_PROXY: localhost,127.0.0.1
+      no_proxy: localhost,127.0.0.1
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/adc
+    secrets: [adc]
+    networks: [sandbox-despliegue]
+    depends_on:
+      proxy-despliegue:
+        condition: service_healthy
+
+networks:
+  sandbox:
+    internal: true
+  sandbox-despliegue:
+    internal: true
+  salida: {}
+
+# Credencial de `gcloud auth application-default login`, montada de solo lectura.
+# En Windows se encuentra sola en %APPDATA%; en Linux o macOS defina ADC_HOST en .env.
+secrets:
+  adc:
+    file: ${ADC_HOST:-${APPDATA}/gcloud/application_default_credentials.json}

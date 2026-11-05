@@ -1,0 +1,17 @@
+# Nunca copiar secretos ni credenciales a la imagen.
+.env
+*.json.key
+application_default_credentials.json
+
+.git
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+*.egg-info
+resultados
+**/.terraform
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+grounding/esquema_completo.json

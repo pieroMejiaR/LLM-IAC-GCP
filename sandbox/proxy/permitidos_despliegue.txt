@@ -1,0 +1,3 @@
+# Modo despliegue: lo mismo que en evaluación más la prueba HTTP del servicio en Cloud Run.
+.googleapis.com
+.run.app

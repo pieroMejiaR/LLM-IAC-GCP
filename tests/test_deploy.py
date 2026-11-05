@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from agent.deploy import buscar_url, ejecutar_despliegue, verificar_plan
 from grounding.catalog import Catalogo
 from sandbox.contract import CambioRecurso
@@ -16,7 +18,8 @@ def respuestas(*valores):
     return lambda _msg: pila.pop(0)
 
 
-def test_verificar_plan_rechaza_fuera_de_catalogo_y_destruccion():   # S8
+@pytest.mark.seguridad("S8")
+def test_verificar_plan_rechaza_fuera_de_catalogo_y_destruccion():
     malos = [CambioRecurso(direccion="google_compute_instance.vm", tipo="google_compute_instance", acciones=["create"]),
              CambioRecurso(direccion="google_storage_bucket.b", tipo="google_storage_bucket",
                            acciones=["delete", "create"])]
@@ -25,7 +28,8 @@ def test_verificar_plan_rechaza_fuera_de_catalogo_y_destruccion():   # S8
     assert verificar_plan(CAMBIOS, PERMITIDOS) == []
 
 
-def test_sin_aprobacion_no_hay_apply(tmp_path):                     # S7
+@pytest.mark.seguridad("S7")
+def test_sin_aprobacion_no_hay_apply(tmp_path):
     d = DesplegadorSimulado(CAMBIOS, {"service_url": "https://app.run.app"})
     res = ejecutar_despliegue(ARCHIVOS, d, proyecto_id="mi-proyecto", tipos_permitidos=PERMITIDOS,
                               confirmar=respuestas("si"), dir_evidencia=tmp_path)
@@ -33,6 +37,7 @@ def test_sin_aprobacion_no_hay_apply(tmp_path):                     # S7
     assert json.loads((tmp_path / "resultado_despliegue.json").read_text())["estado"] == "cancelado"
 
 
+@pytest.mark.seguridad("S8")
 def test_plan_fuera_de_catalogo_no_pregunta(tmp_path):
     malos = [CambioRecurso(direccion="google_compute_instance.vm", tipo="google_compute_instance", acciones=["create"])]
     d = DesplegadorSimulado(malos)

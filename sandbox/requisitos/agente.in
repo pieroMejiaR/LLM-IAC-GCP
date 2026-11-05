@@ -1,0 +1,8 @@
+# Dependencias del agente dentro del contenedor (pyproject.toml + extra dev).
+# Los .lock se regeneran con el comando de la sección "Sandbox en Docker" del README.
+pydantic>=2.7
+pyyaml>=6.0
+typer>=0.12
+litellm==1.105.3
+pytest>=8
+setuptools>=68

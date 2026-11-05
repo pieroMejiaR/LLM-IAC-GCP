@@ -1,0 +1,4 @@
+# Dominios a los que el agente puede abrir túneles HTTPS en modo evaluación.
+# *.googleapis.com cubre Gemini (generativelanguage), OAuth, IAM Credentials
+# (suplantación de la cuenta Viewer) y las APIs que consulta terraform plan.
+.googleapis.com

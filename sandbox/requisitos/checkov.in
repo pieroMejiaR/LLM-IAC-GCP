@@ -1,0 +1,2 @@
+# Checkov va en su propio entorno virtual para no mezclar sus dependencias con las del agente.
+checkov==3.3.30
