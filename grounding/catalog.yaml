@@ -29,6 +29,8 @@ servicios:
       - Definir deletion_protection = false para permitir terraform destroy en las pruebas.
       - Con IP privada, ipv4_enabled = false, private_network apuntando a la VPC y depends_on a google_service_networking_connection.
       - La contraseña del usuario viene de una variable con sensitive = true.
+      - Si la contraseña va dentro de una URL de conexión (por ejemplo, en el valor de un secreto), escribirla con urlencode(); sin codificar, caracteres como @, / o ? rompen la URL.
+      - En google_sql_user y google_sql_database definir deletion_policy = "ABANDON", porque en PostgreSQL la API no puede borrarlos si la aplicación creó objetos; se eliminan igual al destruir la instancia.
   cloud_storage:
     descripcion: Almacenamiento de objetos (buckets de Cloud Storage), incluido el hospedaje de sitios estáticos.
     recursos: [google_storage_bucket]

@@ -149,6 +149,7 @@ class Agente:
                 return Especificacion(**extraer_json(r.texto))
             except (ValueError, ValidationError, TypeError) as e:
                 ultimo_error = str(e)[:800]
+                res.errores_analisis.append(ultimo_error)
         raise ErrorEspecificacion(f"No se obtuvo una especificación válida: {ultimo_error}")
 
     def _reparar(self, validacion: ResultadoValidacion, plan: PlanArchivos, numero: int,

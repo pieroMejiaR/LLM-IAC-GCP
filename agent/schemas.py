@@ -95,6 +95,7 @@ class ResultadoCorrida(BaseModel):
     validacion: ResultadoValidacion | None = None
     intentos_detalle: list[Intento] = Field(default_factory=list)
     llamadas: list[LlamadaLLM] = Field(default_factory=list)
+    errores_analisis: list[str] = Field(default_factory=list)   # respuestas de analizar que no cumplieron el esquema
 
     # Campos del formato de registro (Anexo C)
     validate_ok: bool = False

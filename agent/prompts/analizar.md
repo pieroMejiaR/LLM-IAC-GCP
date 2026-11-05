@@ -17,6 +17,7 @@ Reglas:
 - Usa solo tipos de la lista. Si el requerimiento pide algo fuera de la lista, no lo incluyas y anótalo en "supuestos".
 - "nombre" va en minúsculas, con letras, números y guiones, empieza por letra y tiene como máximo 40 caracteres.
 - Si falta un dato (región, tamaño, exposición pública), elige la opción más segura y más barata y regístrala en "supuestos".
+- Cada valor de "parametros" es un texto, un número o un booleano; no uses listas ni objetos anidados. Si hay varios valores relacionados (por ejemplo, variables de entorno), usa una clave por cada uno.
 - Para cloud_sql_postgres indica en "parametros" la clave "ip_publica" (true o false); por defecto false.
 - Copia en "restricciones" las condiciones explícitas del requerimiento (por ejemplo, "la base de datos no tiene IP pública").
 - No agregues servicios que el requerimiento no pide.

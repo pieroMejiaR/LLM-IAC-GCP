@@ -1,6 +1,8 @@
 # Caso real: sistema de pedidos de la picantería (repositorio picanteria-digital).
 # Antes de desplegar: publicar las dos imágenes en Artifact Registry y reemplazar PROYECTO
 # en contexto.imagen_api y contexto.imagen_web. La web debe leer API_URL (ver mensaje a Paolo).
+# Si un apply falla y hay que destruir y repetir, cambiar el sufijo de picanteria-db-1107 en el
+# requerimiento y el checklist: Cloud SQL no deja reutilizar el nombre de una instancia borrada por varios días.
 id: REAL-01
 nivel: caso_real
 titulo: Sistema de pedidos de una picantería
@@ -11,7 +13,7 @@ requerimiento: >
   /socket.io a la API, cuya URL recibe en la variable de entorno API_URL. Los dos
   servicios deben ser accesibles públicamente por HTTPS.
   La API usa PostgreSQL 17 con una base de datos llamada picanteria y un usuario
-  picanteria. La instancia debe ser la más pequeña y barata posible, con IP pública
+  picanteria. La instancia se llama picanteria-db-1107 y debe ser la más pequeña y barata posible, con IP pública
   pero sin redes autorizadas: la API se conecta solo mediante el conector de Cloud SQL
   de Cloud Run, por socket en /cloudsql.
   La API recibe estas variables de entorno: DATABASE_URL (URL de Prisma con
@@ -46,7 +48,7 @@ restricciones:
 checklist:
   - Dos servicios de Cloud Run (api y web) con las imágenes indicadas y la cuenta de servicio propia
   - Los dos servicios son invocables por allUsers
-  - Cloud SQL PostgreSQL 17, edición ENTERPRISE, tier db-f1-micro, sin authorized_networks
+  - Cloud SQL PostgreSQL 17 llamada picanteria-db-1107, edición ENTERPRISE, tier db-f1-micro, sin authorized_networks
   - La API monta la instancia en /cloudsql y lee DATABASE_URL e INITIAL_ADMIN_PASSWORD desde Secret Manager
   - La cuenta de servicio tiene roles/cloudsql.client y roles/secretmanager.secretAccessor
   - La web recibe API_URL con la URL de la API

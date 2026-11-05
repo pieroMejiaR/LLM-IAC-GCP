@@ -83,6 +83,8 @@ def test_t1_reintenta_especificacion_invalida():
     res = ag.correr(ESCENARIO, "T1")
     assert res.especificacion is not None
     assert "no cumplió el esquema" in fn.prompts[1]
+    # El error del primer intento queda registrado en el resultado
+    assert len(res.errores_analisis) == 1 and "servicios.0.tipo" in res.errores_analisis[0]
 
 
 def test_t1_respuesta_sin_archivos_se_repara():
