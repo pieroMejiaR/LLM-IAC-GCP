@@ -1,26 +1,53 @@
-# Plantilla del caso que se despliega de verdad. Completar cuando el equipo elija la aplicación.
-# Antes de desplegar: construir y publicar la imagen del contenedor y poner su URL en contexto.container_image.
+# Caso real: sistema de pedidos de la picantería (repositorio picanteria-digital).
+# Antes de desplegar: publicar las dos imágenes en Artifact Registry y reemplazar PROYECTO
+# en contexto.imagen_api y contexto.imagen_web. La web debe leer API_URL (ver mensaje a Paolo).
 id: REAL-01
 nivel: caso_real
-titulo: Aplicación web del caso real (por definir)
+titulo: Sistema de pedidos de una picantería
 requerimiento: >
-  Necesitamos desplegar nuestra aplicación web en Google Cloud. La aplicación
-  corre en un contenedor que escucha en el puerto 8080 y debe ser accesible
-  públicamente por HTTPS. Debe usar una cuenta de servicio propia con permisos
-  mínimos. Región: Santiago de Chile. Debe ser lo más barata posible.
-  (Agregar aquí la base de datos, el almacenamiento o los secretos si la aplicación los necesita.)
+  Necesitamos desplegar en Google Cloud el sistema de pedidos de nuestra picantería.
+  Son dos contenedores ya publicados en Artifact Registry. La API (NestJS) escucha en
+  el puerto 3000. La web (nginx) escucha en el puerto 80 y reenvía las rutas /api y
+  /socket.io a la API, cuya URL recibe en la variable de entorno API_URL. Los dos
+  servicios deben ser accesibles públicamente por HTTPS.
+  La API usa PostgreSQL 17 con una base de datos llamada picanteria y un usuario
+  picanteria. La instancia debe ser la más pequeña y barata posible, con IP pública
+  pero sin redes autorizadas: la API se conecta solo mediante el conector de Cloud SQL
+  de Cloud Run, por socket en /cloudsql.
+  La API recibe estas variables de entorno: DATABASE_URL (URL de Prisma con
+  host=/cloudsql/<nombre de conexión de la instancia>), COOKIE_SECURE con valor "true",
+  INITIAL_ADMIN_USERNAME con valor "admin" e INITIAL_ADMIN_PASSWORD. La URL de la base
+  de datos y la contraseña del administrador se guardan en Secret Manager; las
+  contraseñas se reciben como variables sensibles.
+  Los dos servicios usan una cuenta de servicio propia con permisos mínimos.
+  La URL pública de la web se exporta con el nombre service_url.
+  Región: Santiago de Chile. Debe ser lo más barato posible y poder destruirse por completo.
 contexto:
   region: southamerica-west1
   entornos: [dev]
-  container_image: REEMPLAZAR-por-la-URL-de-la-imagen   # p. ej. southamerica-west1-docker.pkg.dev/PROYECTO/repo/app:v1
-  puerto: 8080
+  imagen_api: southamerica-west1-docker.pkg.dev/PROYECTO/apps/picanteria-api:v1
+  imagen_web: southamerica-west1-docker.pkg.dev/PROYECTO/apps/picanteria-web:v1
+  puerto_api: 3000
+  puerto_web: 80
 servicios_esperados:
   - google_cloud_run_v2_service
   - google_cloud_run_v2_service_iam_member
+  - google_sql_database_instance
+  - google_sql_database
+  - google_sql_user
+  - google_secret_manager_secret
+  - google_secret_manager_secret_version
   - google_service_account
+  - google_project_iam_member
 restricciones:
-  - el servicio responde por HTTPS con código 200 en la ruta raíz
+  - la instancia de Cloud SQL no tiene redes autorizadas
+  - las contraseñas no aparecen en el código
+  - la web responde por HTTPS con código 200 en la ruta raíz
 checklist:
-  - Cloud Run usa la imagen indicada y la cuenta de servicio propia
-  - El servicio es invocable por allUsers
-  - La salida service_url devuelve 200
+  - Dos servicios de Cloud Run (api y web) con las imágenes indicadas y la cuenta de servicio propia
+  - Los dos servicios son invocables por allUsers
+  - Cloud SQL PostgreSQL 17, edición ENTERPRISE, tier db-f1-micro, sin authorized_networks
+  - La API monta la instancia en /cloudsql y lee DATABASE_URL e INITIAL_ADMIN_PASSWORD desde Secret Manager
+  - La cuenta de servicio tiene roles/cloudsql.client y roles/secretmanager.secretAccessor
+  - La web recibe API_URL con la URL de la API
+  - La salida service_url (web) devuelve 200
