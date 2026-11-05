@@ -1,0 +1,12 @@
+# Configuración de la CLI de Terraform dentro del contenedor (TF_CLI_CONFIG_FILE).
+# Los proveedores se instalan solo desde el espejo precargado en la imagen.
+# No hay bloque "direct": cualquier proveedor que no sea google o google-beta,
+# o cualquier versión distinta de la precargada, falla en terraform init.
+provider_installation {
+  filesystem_mirror {
+    path    = "/opt/terraform/plugins"
+    include = ["registry.terraform.io/hashicorp/google", "registry.terraform.io/hashicorp/google-beta"]
+  }
+}
+
+disable_checkpoint = true

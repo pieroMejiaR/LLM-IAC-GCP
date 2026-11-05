@@ -9,6 +9,7 @@ DesplegadorLocal -> modo despliegue. Agrega apply, output y destroy; solo lo usa
 """
 from __future__ import annotations
 
+import functools
 import json
 import os
 import re
@@ -47,10 +48,51 @@ _PALABRAS_ENTORNO = (
     "no such host",
 )
 _MAX_SALIDA = 20_000
+_SUFIJOS_SECRETOS = ("_API_KEY", "_API_TOKEN", "_SECRET_KEY")
 
 
 class ComandoNoPermitido(RuntimeError):
     pass
+
+
+# --------------------------------------------------------------------------- versiones
+
+@functools.lru_cache(maxsize=None)
+def versiones_linters(tflint_config: str | None = None) -> dict[str, str]:
+    """Versiones de TFLint, su ruleset google y Checkov (se consultan una vez por proceso)."""
+    versiones: dict[str, str] = {}
+
+    def correr(cmd: list[str]) -> str:
+        try:
+            p = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        except (OSError, subprocess.SubprocessError):
+            return ""
+        return p.stdout + p.stderr
+
+    if shutil.which("tflint"):
+        cmd = ["tflint", "--version"] + (["--config", str(Path(tflint_config).resolve())] if tflint_config else [])
+        salida = correr(cmd)
+        if m := re.search(r"TFLint version (\S+)", salida):
+            versiones["tflint"] = m.group(1)
+        if m := re.search(r"ruleset\.google \((\S+)\)", salida):
+            versiones["tflint-ruleset-google"] = m.group(1)
+    if shutil.which("checkov") and (m := re.search(r"\d+\.\d+\.\d+", correr(["checkov", "--version"]))):
+        versiones["checkov"] = m.group()
+    return versiones
+
+
+def parse_version_json(texto: str) -> dict[str, str]:
+    """Lee `terraform version -json`: versión de Terraform y de cada proveedor instalado."""
+    try:
+        datos = json.loads(texto)
+    except json.JSONDecodeError:
+        return {}
+    versiones = {}
+    if datos.get("terraform_version"):
+        versiones["terraform"] = datos["terraform_version"]
+    for fuente, version in (datos.get("provider_selections") or {}).items():
+        versiones[fuente.rsplit("/", 1)[-1]] = version   # google, google-beta
+    return versiones
 
 
 def clasificar_origen(mensaje: str) -> str:
@@ -213,6 +255,9 @@ class _Ejecutor:
 
 def _entorno_base(proyecto: str | None, region: str, cuenta: str | None) -> dict[str, str]:
     env = dict(os.environ)
+    # Terraform, TFLint y Checkov no necesitan la clave del LLM: no se les pasa.
+    for clave in [k for k in env if k.upper().endswith(_SUFIJOS_SECRETOS)]:
+        env.pop(clave)
     # La credencial la decide este módulo, no el entorno de quien ejecuta.
     env.pop("GOOGLE_IMPERSONATE_SERVICE_ACCOUNT", None)
     env.update({"TF_IN_AUTOMATION": "1", "TF_INPUT": "0", "CHECKPOINT_DISABLE": "1"})
@@ -291,6 +336,8 @@ class ValidadorLocal:
 
         rc, out, err, dur = self.ej.terraform_cmd(["init", "-input=false", "-no-color"], d, env)
         res.controles.append(_control("init", rc == 0, parse_texto_errores(err, "init") if rc else [], dur, out + err))
+        rc_v, out_v, _, _ = self.ej.terraform_cmd(["version", "-json"], d, env)
+        res.versiones = {**(parse_version_json(out_v) if rc_v == 0 else {}), **versiones_linters(self.tflint_config)}
         if rc:
             return res
 
