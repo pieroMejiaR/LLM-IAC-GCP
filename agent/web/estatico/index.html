@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agente IaC para Google Cloud</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="barra">
+    <h1 class="marca">Agente IaC <span class="marca-sub">para Google Cloud</span></h1>
+    <dl class="entorno" id="entorno" aria-label="Estado del entorno"></dl>
+  </header>
+
+  <main class="tablero">
+    <section class="conversacion" aria-label="Conversación con el agente">
+      <div class="registro" id="registro" aria-live="polite"></div>
+      <div class="redactor" id="redactor"></div>
+    </section>
+
+    <section class="mesa" id="mesa" aria-label="Mesa de trabajo"></section>
+  </main>
+
+  <noscript><p class="sin-js">Esta interfaz necesita JavaScript.</p></noscript>
+</body>
+</html>

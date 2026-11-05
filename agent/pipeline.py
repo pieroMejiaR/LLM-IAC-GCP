@@ -73,21 +73,59 @@ class Agente:
 
     def correr(self, escenario: Escenario, tratamiento: Tratamiento = "T1", *, repeticion: int = 1,
                semilla: int | None = None) -> ResultadoCorrida:
-        res = ResultadoCorrida(run_id=uuid.uuid4().hex[:12], escenario_id=escenario.id, nivel=escenario.nivel,
-                               tratamiento=tratamiento, repeticion=repeticion, semilla=semilla,
-                               modelo=self.llm.modelo)
+        """Corrida completa sin intervención humana (experimento y CLI)."""
+        res = self.iniciar(escenario, tratamiento, repeticion=repeticion, semilla=semilla)
+        spec: Especificacion | None = None
+        if tratamiento == "T1":
+            spec = self.especificar(escenario, res)
+            if spec is None:
+                self._cerrar(res, None, escenario)
+                return res
+        return self.completar(escenario, res, spec)
+
+    # La interfaz web usa los mismos pasos por separado para que la persona revise la
+    # especificación antes de generar: iniciar, especificar (una o más veces) y completar.
+
+    def iniciar(self, escenario: Escenario, tratamiento: Tratamiento = "T1", *, repeticion: int = 1,
+                semilla: int | None = None) -> ResultadoCorrida:
+        return ResultadoCorrida(run_id=uuid.uuid4().hex[:12], escenario_id=escenario.id, nivel=escenario.nivel,
+                                tratamiento=tratamiento, repeticion=repeticion, semilla=semilla,
+                                modelo=self.llm.modelo)
+
+    def especificar(self, escenario: Escenario, res: ResultadoCorrida,
+                    correcciones: str | None = None) -> Especificacion | None:
+        """Paso 1 de T1. Devuelve None si falla; el error queda en res."""
+        t0 = time.perf_counter()
+        try:
+            spec = self._analizar(escenario, res, correcciones)
+            res.especificacion = spec
+            res.tipo_error, res.error_final = "ninguno", None
+            return spec
+        except ErrorLLM as e:
+            res.tipo_error, res.error_final = "entorno", str(e)[:600]
+        except ErrorEspecificacion as e:
+            res.tipo_error, res.error_final = "codigo", str(e)[:600]
+        finally:
+            res.tiempo_s += time.perf_counter() - t0
+        return None
+
+    def completar(self, escenario: Escenario, res: ResultadoCorrida,
+                  spec: Especificacion | None = None) -> ResultadoCorrida:
+        """T1: planificar, generar, validar y reparar desde la especificación. T0: la llamada única."""
         t0 = time.perf_counter()
         validacion: ResultadoValidacion | None = None
         try:
-            if tratamiento == "T1":
-                validacion = self._t1(escenario, res)
+            if res.tratamiento == "T1":
+                if spec is None:
+                    raise ValueError("T1 necesita una especificación")
+                validacion = self._t1(escenario, res, spec)
             else:
                 validacion = self._t0(escenario, res)
         except ErrorLLM as e:
             res.tipo_error, res.error_final = "entorno", str(e)[:600]
         except ErrorEspecificacion as e:
             res.tipo_error, res.error_final = "codigo", str(e)[:600]
-        res.tiempo_s = time.perf_counter() - t0
+        res.tiempo_s += time.perf_counter() - t0
         self._cerrar(res, validacion, escenario)
         return res
 
@@ -101,9 +139,7 @@ class Agente:
         validacion = self._validar(archivos, error, res, numero=0, accion="generar")
         return validacion
 
-    def _t1(self, esc: Escenario, res: ResultadoCorrida) -> ResultadoValidacion:
-        spec = self._analizar(esc, res)
-        res.especificacion = spec
+    def _t1(self, esc: Escenario, res: ResultadoCorrida, spec: Especificacion) -> ResultadoValidacion:
         plan = self.catalogo.planificar(spec)
         res.plan_archivos = plan
 
@@ -132,11 +168,19 @@ class Agente:
 
     # ------------------------------------------------------------------ pasos
 
-    def _analizar(self, esc: Escenario, res: ResultadoCorrida) -> Especificacion:
+    def _analizar(self, esc: Escenario, res: ResultadoCorrida, correcciones: str | None = None) -> Especificacion:
+        requerimiento = esc.requerimiento
+        if correcciones and correcciones.strip():
+            # Revisión humana desde la interfaz web: la plantilla no cambia, el texto se agrega al requerimiento.
+            if res.especificacion is not None:
+                requerimiento += ("\n\nEspecificación propuesta antes:\n"
+                                  + res.especificacion.model_dump_json(indent=2))
+            requerimiento += ("\n\nCorrecciones de la persona usuaria sobre esa especificación (tienen prioridad):\n"
+                              + correcciones.strip())
         usuario = prompts.render(
             "analizar",
             servicios=self.catalogo.descripcion_servicios(),
-            requerimiento=esc.requerimiento,
+            requerimiento=requerimiento,
             contexto=json.dumps(esc.contexto, ensure_ascii=False),
             region=esc.contexto.get("region", self.config.region),
         )

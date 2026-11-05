@@ -55,6 +55,18 @@ docker compose run --rm despliegue desplegar casos/caso_real.yaml
 
 `eval/` y `casos/` se montan de solo lectura (los escenarios nuevos no requieren reconstruir la imagen) y los resultados quedan en `resultados/`.
 
+### Interfaz web
+
+```bash
+docker compose up -d web-puente         # abre http://127.0.0.1:8787 (otro puerto: WEB_PUERTO=9000 en .env)
+docker compose down                     # la apaga
+docker compose up -d --force-recreate web   # tras cambiar .env o hacer el login de ADC (la web lee la configuración al arrancar)
+```
+
+Es un chat del modo evaluación: la persona escribe el requerimiento, revisa la especificación (la aprueba o pide cambios, y cada ronda es una revisión A, B, C…), y el agente genera, valida y repara con el mismo bucle T1 del experimento (`Agente.iniciar`, `especificar` y `completar`, que también usa `correr`). Muestra la línea de controles de cada intento, los hallazgos de Checkov, el costo y los archivos, que se descargan en un `.zip`. **Nunca despliega**: el despliegue sigue en la terminal con `desplegar`.
+
+Las corridas de la interfaz se guardan en `resultados/web/`, fuera de los escenarios del experimento. El servidor usa solo la biblioteca estándar (`agent/web/servidor.py`), atiende un trabajo con el LLM a la vez, solo responde a `localhost` y del mismo origen, y la página inserta el texto del modelo con `textContent`. El servicio `web` queda en la red interna como el agente; `web-puente` (nginx sin privilegios, imagen fijada por digest, `sandbox/puente/nginx.conf`) es la única pieza con puerto publicado y no ejecuta código del agente.
+
 | Capa | Qué hace |
 | --- | --- |
 | Revisión del código | `sandbox/guard.py` analiza el HCL antes de `init` y rechaza otros proveedores, `provisioner`, `data "external"` y `"http"`, módulos, `backend`, `import`, funciones que leen archivos (`file`, `templatefile`…), fuentes de datos que exponen tokens y argumentos del provider que cambian la credencial o los endpoints. Si no puede analizar un archivo, lo rechaza (S2 a S4). |
@@ -139,7 +151,9 @@ Sin este archivo el agente funciona, pero el grounding usa solo las notas del ca
 | `sandbox/guard.py` | Revisión estática del HCL previa a `init` | Santiago |
 | `Dockerfile`, `compose.yaml`, `sandbox/proxy/` | Imagen del sandbox, red aislada y proxy de salida | Santiago |
 | `sandbox/pruebas_seguridad.py` | Evidencia de S5, S6 y versiones | Santiago |
-| `agent/cli.py` | CLI mínima | Paolo la amplía |
+| `agent/cli.py` | CLI: `generar`, `desplegar`, `destruir` y `web` | Piero |
+| `agent/web/` | Interfaz web (chat) del modo evaluación | Piero |
+| `sandbox/puente/` | nginx que publica la interfaz web en 127.0.0.1 | Piero; revisa Santiago |
 | `eval/` | Escenarios y ejecución por lotes | Gabriel |
 
 ## Cuentas de servicio

@@ -87,6 +87,22 @@ def test_t1_reintenta_especificacion_invalida():
     assert len(res.errores_analisis) == 1 and "servicios.0.tipo" in res.errores_analisis[0]
 
 
+def test_pasos_separados_equivalen_a_correr():
+    """La interfaz web llama a iniciar, especificar (con correcciones) y completar por separado."""
+    spec_b = {**SPEC, "proyecto": "sitio-b"}
+    ag, fn = agente([json.dumps(SPEC), json.dumps(spec_b), CODIGO_OK], ValidadorSimulado())
+    res = ag.iniciar(ESCENARIO, "T1")
+    assert ag.especificar(ESCENARIO, res).proyecto == "sitio"
+    spec = ag.especificar(ESCENARIO, res, "Cambia el nombre del proyecto a sitio-b.")
+    assert spec.proyecto == "sitio-b" and res.especificacion == spec
+    assert "Cambia el nombre del proyecto a sitio-b." in fn.prompts[1] and '"proyecto": "sitio"' in fn.prompts[1]
+    assert "Correcciones" not in fn.prompts[0]
+    ag.completar(ESCENARIO, res, spec)
+    assert res.validate_ok and res.plan_ok and res.intentos == 0
+    assert [c.etapa for c in res.llamadas] == ["analizar", "analizar", "generar"]
+    assert res.tiempo_s > 0 and res.tipo_error == "ninguno"
+
+
 def test_t1_respuesta_sin_archivos_se_repara():
     validador = ValidadorSimulado()
     ag, fn = agente([json.dumps(SPEC), "No puedo ayudar", CODIGO_OK], validador)

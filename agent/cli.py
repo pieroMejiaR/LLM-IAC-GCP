@@ -3,10 +3,12 @@
     python -m agent generar eval/scenarios/BAS-01.yaml --tratamiento T1
     python -m agent desplegar casos/caso_real.yaml
     python -m agent destruir resultados/despliegue/<run_id>/terraform
+    python -m agent web        # interfaz web del modo evaluación (en Docker: docker compose up -d web-puente)
 """
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import typer
@@ -51,9 +53,7 @@ def _guardar(res: ResultadoCorrida, salida: Path) -> Path:
 
 
 def _resumen(res: ResultadoCorrida) -> str:
-    control_plan = res.validacion.control("plan") if res.validacion else None
-    plan = "ok" if res.plan_ok else ("omitido" if control_plan and control_plan.omitido else "falla")
-    return (f"validate={'ok' if res.validate_ok else 'falla'}  plan={plan}  "
+    return (f"validate={'ok' if res.validate_ok else 'falla'}  plan={res.estado_plan()}  "
             f"reparaciones={res.intentos}  checkov={res.checkov_fallidas}  tiempo={res.tiempo_s:.1f}s  "
             f"tokens={res.tokens_entrada}+{res.tokens_salida}  costo=${res.costo_usd:.4f}"
             + (f"\nerror ({res.tipo_error}): {res.error_final}" if res.error_final else ""))
@@ -109,6 +109,37 @@ def desplegar(
     typer.echo(json.dumps({"estado": resultado.estado, "motivo": resultado.motivo,
                            "prueba_http": resultado.prueba_http, "duraciones_s": resultado.duraciones_s},
                           indent=2, ensure_ascii=False))
+
+
+@app.command()
+def web(
+    puerto: int = typer.Option(8000, help="Puerto del servidor"),
+    salida: Path = typer.Option(Path("resultados/web"), help="Carpeta de resultados de la interfaz"),
+) -> None:
+    """Interfaz web (chat) del modo evaluación: revisión de la especificación y descarga. Nunca despliega."""
+    from agent.web.servidor import REGIONES, Aplicacion, crear_servidor
+
+    cfg = Config.desde_entorno()
+    agente = _componentes(cfg, simulado=False, sin_plan=False)
+    info = {
+        "modelo": cfg.modelo,
+        "region": cfg.region if cfg.region in REGIONES else REGIONES[0],
+        "regiones": list(REGIONES),
+        "plan": bool(cfg.proyecto_gcp and cfg.cuenta_evaluacion),
+        "max_reparaciones": cfg.max_reparaciones,
+        "tarifas_usd_m": [cfg.tarifa_entrada_usd_m, cfg.tarifa_salida_usd_m],
+    }
+    # Dentro del contenedor escucha en todas las interfaces de la red interna (solo llega web-puente);
+    # fuera de Docker, solo en localhost.
+    host = "0.0.0.0" if os.environ.get("SANDBOX_CONTENEDOR") else "127.0.0.1"  # noqa: S104
+    servidor = crear_servidor(Aplicacion(agente, salida, info, _guardar), host, puerto)
+    typer.echo(f"Interfaz web escuchando en {host}:{puerto}. Con Docker: http://127.0.0.1:8787")
+    try:
+        servidor.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        servidor.server_close()
 
 
 @app.command()

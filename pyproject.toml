@@ -21,7 +21,7 @@ build-backend = "setuptools.build_meta"
 include = ["agent*", "grounding*", "sandbox*"]
 
 [tool.setuptools.package-data]
-agent = ["prompts/*.md"]
+agent = ["prompts/*.md", "web/estatico/*"]
 grounding = ["catalog.yaml"]
 
 [tool.pytest.ini_options]

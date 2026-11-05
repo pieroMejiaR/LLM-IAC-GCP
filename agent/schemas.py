@@ -16,7 +16,7 @@ Tratamiento = Literal["T0", "T1"]
 
 class Escenario(BaseModel):
     id: str
-    nivel: Literal["basico", "intermedio", "avanzado", "piloto", "caso_real"]
+    nivel: Literal["basico", "intermedio", "avanzado", "piloto", "caso_real", "interactivo"]
     titulo: str
     requerimiento: str
     contexto: dict = Field(default_factory=dict)
@@ -112,6 +112,13 @@ class ResultadoCorrida(BaseModel):
     error_final: str | None = None
     tipo_error: Literal["ninguno", "codigo", "entorno"] = "ninguno"
     versiones: dict[str, str] = Field(default_factory=dict)
+
+    def estado_plan(self) -> str:
+        """ok, omitido (sin GCP o con --sin-plan) o falla."""
+        if self.plan_ok:
+            return "ok"
+        c = self.validacion.control("plan") if self.validacion else None
+        return "omitido" if c and c.omitido else "falla"
 
     def fila_csv(self) -> dict:
         """Fila para results/runs.csv (Anexo C)."""
