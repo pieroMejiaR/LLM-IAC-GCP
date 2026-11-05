@@ -1,0 +1,63 @@
+# Servicios del catálogo: cloud_run, cloud_sql_postgres, vpc, cloud_storage, secret_manager, iam (6), en dos entornos
+id: AVA-03
+nivel: avanzado
+titulo: Fintech con entornos de staging y producción aislados
+requerimiento: >
+  Una fintech que ofrece billeteras digitales en Estados Unidos necesita dos
+  entornos, staging y prod, con la misma arquitectura pero recursos separados.
+  En cada entorno hay una API pública por HTTPS en un contenedor, una base
+  PostgreSQL sin IP pública, un bucket privado para los estados de cuenta en
+  PDF, un secreto con la clave de API del proveedor de verificación de
+  identidad (que la API recibe como variable de entorno) y una cuenta de
+  servicio propia con permisos mínimos. Ambos entornos comparten una red
+  privada, pero cada uno tiene su subred (10.30.0.0/24 para staging y
+  10.40.0.0/24 para prod) y solo se admite tráfico interno de esas subredes.
+  Staging debe ser lo más barato posible y escalar a cero; prod usa
+  db-g1-small, mantiene una instancia encendida y tiene respaldos automáticos.
+  Ninguna cuenta de servicio de un entorno puede acceder a los recursos del
+  otro. Región: Virginia del Norte (us-east4).
+contexto:
+  region: us-east4
+  entornos: [staging, prod]
+  rangos_subred:
+    staging: 10.30.0.0/24
+    prod: 10.40.0.0/24
+  tier_bd:
+    staging: db-f1-micro
+    prod: db-g1-small
+  min_instancias:
+    staging: 0
+    prod: 1
+servicios_esperados:
+  - google_cloud_run_v2_service
+  - google_cloud_run_v2_service_iam_member
+  - google_sql_database_instance
+  - google_sql_database
+  - google_sql_user
+  - google_compute_global_address
+  - google_service_networking_connection
+  - google_compute_network
+  - google_compute_subnetwork
+  - google_compute_firewall
+  - google_storage_bucket
+  - google_secret_manager_secret
+  - google_secret_manager_secret_version
+  - google_service_account
+  - google_project_iam_member
+restricciones:
+  - cada entorno tiene sus propios recursos, salvo la red compartida
+  - las bases de datos no tienen IP pública
+  - los buckets de estados de cuenta no son públicos
+  - los secretos y contraseñas no aparecen en el código
+  - las cuentas de servicio no tienen roles primitivos ni acceso a recursos del otro entorno
+checklist:
+  - Cada recurso por entorno existe dos veces (staging y prod), con el entorno en el nombre o en una etiqueta
+  - Una sola VPC con auto_create_subnetworks = false, dos subredes en us-east4 (10.30.0.0/24 y 10.40.0.0/24) y firewall de ingreso solo desde esos rangos
+  - Un solo rango reservado (purpose VPC_PEERING) y una sola conexión de service networking para la VPC
+  - Dos instancias POSTGRES_16 con ipv4_enabled = false, private_network a la VPC, deletion_protection = false y depends_on a la conexión; staging db-f1-micro, prod db-g1-small con backup_configuration habilitado
+  - Dos servicios Cloud Run (v2) invocables por allUsers, con min_instance_count 0 en staging y 1 en prod, cada uno con su cuenta de servicio y Direct VPC egress
+  - Cada API lee la clave de su entorno con env.value_source.secret_key_ref
+  - Dos buckets con public_access_prevention = "enforced", uniform_bucket_level_access = true, force_destroy = true y nombres distintos con var.project_id como prefijo
+  - Los secretos usan replication { auto {} } y sus versiones, igual que las contraseñas, vienen de variables con sensitive = true
+  - Ninguna cuenta tiene roles primitivos; los permisos sobre secretos y buckets se limitan al entorno (por ejemplo, con condiciones IAM sobre el nombre del recurso)
+  - outputs.tf exporta las URL de ambas APIs (service_url por entorno o un mapa)

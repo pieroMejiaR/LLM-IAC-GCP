@@ -1,0 +1,39 @@
+# Servicios del catálogo: cloud_run, secret_manager, iam (3)
+id: INT-02
+nivel: intermedio
+titulo: Servicio interno de tarifas invocable solo por el ERP
+requerimiento: >
+  Una empresa de logística de la costa este de Estados Unidos necesita un
+  servicio interno que calcula tarifas de envío. Corre en un contenedor y no
+  debe ser público: solo lo puede invocar el ERP de la empresa, que usa su
+  propia cuenta de servicio en Google Cloud (hay que crearla). El servicio
+  consulta un proveedor de mapas cuya clave de API se guarda en Secret Manager
+  y le llega como variable de entorno. El servicio usa una cuenta de servicio
+  propia que solo puede leer secretos. Para evitar demoras por arranque en
+  frío debe mantener siempre una instancia encendida y escalar hasta cinco.
+  Región: Carolina del Sur (us-east1).
+contexto:
+  region: us-east1
+  entornos: [dev]
+  min_instancias: 1
+  max_instancias: 5
+  cpu: "1"
+  memoria: 1Gi
+servicios_esperados:
+  - google_cloud_run_v2_service
+  - google_secret_manager_secret
+  - google_secret_manager_secret_version
+  - google_service_account
+  - google_project_iam_member
+restricciones:
+  - el servicio no es invocable por allUsers ni allAuthenticatedUsers
+  - la clave del proveedor de mapas no aparece en el código
+  - las cuentas de servicio no tienen roles primitivos
+checklist:
+  - Cloud Run (v2) en us-east1 sin ningún binding a allUsers ni allAuthenticatedUsers
+  - Cloud Run usa la cuenta de servicio propia y lee la clave con env.value_source.secret_key_ref
+  - scaling tiene min_instance_count = 1 y max_instance_count = 5; el contenedor tiene límites cpu = "1" y memory = "1Gi"
+  - El secreto usa replication { auto {} } y su versión toma el valor de una variable con sensitive = true
+  - Existen dos cuentas de servicio, una para el servicio y otra para el ERP
+  - La cuenta del servicio tiene roles/secretmanager.secretAccessor; la del ERP tiene roles/run.invoker; ninguna tiene roles primitivos
+  - outputs.tf exporta service_url

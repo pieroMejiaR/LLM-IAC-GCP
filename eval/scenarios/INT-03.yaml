@@ -1,0 +1,41 @@
+# Servicios del catálogo: cloud_sql_postgres (IP pública), cloud_storage, secret_manager (3)
+id: INT-03
+nivel: intermedio
+titulo: Base analítica con IP pública restringida y exportaciones
+requerimiento: >
+  El equipo de analítica de un comercio electrónico de España necesita una
+  base PostgreSQL a la que se conecta directamente desde la red de su oficina
+  (203.0.113.0/24): por eso tendrá IP pública, pero solo debe aceptar
+  conexiones desde ese rango y siempre cifradas con SSL. Necesita un poco más
+  de capacidad que la mínima (db-g1-small), respaldos automáticos diarios a
+  las 02:00 UTC y recuperación a un punto en el tiempo. La contraseña del
+  usuario de analítica se guarda también en Secret Manager para que el equipo
+  la consulte. Las exportaciones en CSV van a un bucket privado donde los
+  archivos se borran a los 30 días. Región: Madrid.
+contexto:
+  region: europe-southwest1
+  entornos: [dev]
+  red_autorizada: 203.0.113.0/24
+  tier_bd: db-g1-small
+  hora_respaldo: "02:00"
+  dias_retencion_exportaciones: 30
+servicios_esperados:
+  - google_sql_database_instance
+  - google_sql_database
+  - google_sql_user
+  - google_storage_bucket
+  - google_secret_manager_secret
+  - google_secret_manager_secret_version
+restricciones:
+  - la base de datos solo acepta conexiones desde 203.0.113.0/24
+  - las conexiones a la base de datos usan SSL
+  - el bucket de exportaciones no es público
+  - la contraseña no aparece en el código
+checklist:
+  - La instancia es POSTGRES_16 en europe-southwest1, tier db-g1-small y deletion_protection = false
+  - ip_configuration tiene ipv4_enabled = true, un único authorized_networks con 203.0.113.0/24 y ssl_mode = "ENCRYPTED_ONLY"
+  - backup_configuration está habilitado con start_time = "02:00" y point_in_time_recovery_enabled = true
+  - Existen una base de datos y un usuario cuya contraseña viene de una variable con sensitive = true
+  - El secreto usa replication { auto {} } y su versión toma el valor de la misma variable sensible
+  - El bucket tiene uniform_bucket_level_access = true, public_access_prevention = "enforced", force_destroy = true y nombre con var.project_id como prefijo
+  - Una regla de lifecycle borra los objetos del bucket a los 30 días
