@@ -72,6 +72,16 @@ docker run --rm -v "$PWD/sandbox/requisitos:/w" -w /w python:3.12.15-slim-trixie
 
 El esquema del grounding (`grounding/esquema_catalogo.json`) se genera dentro de la imagen con la misma versión del proveedor que valida.
 
+### Diagnóstico del entorno
+
+Antes de S5, de la corrida del experimento o del despliegue, quien tiene las credenciales ejecuta:
+
+```bash
+docker compose run --rm --entrypoint python agente -m sandbox.pruebas_seguridad diagnostico
+```
+
+Revisa las variables de `.env`, la credencial montada, la salida por el proxy, la clave y el modelo de Gemini, la suplantación de las cuentas de evaluación y despliegue (con un `terraform plan` que solo lee el proyecto) y el tiempo de una validación completa. No muestra la clave ni tokens, así que el archivo que deja en `resultados/evidencia/` se puede compartir con el equipo.
+
 ### Evidencia de seguridad
 
 `pytest` termina con un resumen de las pruebas S1 a S8. S5 y S6 tienen además su propia evidencia, que se guarda en `resultados/evidencia/`:
