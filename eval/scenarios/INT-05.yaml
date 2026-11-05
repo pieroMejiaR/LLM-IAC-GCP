@@ -1,0 +1,44 @@
+# Servicios del catálogo: vpc, cloud_sql_postgres, secret_manager, iam (4)
+id: INT-05
+nivel: intermedio
+titulo: Red de datos universitaria con PostgreSQL privado
+requerimiento: >
+  El área de datos de una universidad prepara la infraestructura para sus
+  procesos ETL. Necesita una red propia con una subred en el rango
+  10.10.0.0/24. En esa red solo se permite el tráfico interno de la subred y
+  el acceso SSH desde Identity-Aware Proxy (35.235.240.0/20); nada más desde
+  internet. Los datos van a una base PostgreSQL sin IP pública conectada a esa
+  red. La contraseña de la base se guarda en Secret Manager. Los procesos ETL
+  usarán una cuenta de servicio propia que solo puede conectarse a la base y
+  leer ese secreto. Región: Iowa (us-central1).
+contexto:
+  region: us-central1
+  entornos: [dev]
+  rango_subred: 10.10.0.0/24
+  rango_iap: 35.235.240.0/20
+servicios_esperados:
+  - google_compute_network
+  - google_compute_subnetwork
+  - google_compute_firewall
+  - google_sql_database_instance
+  - google_sql_database
+  - google_sql_user
+  - google_compute_global_address
+  - google_service_networking_connection
+  - google_secret_manager_secret
+  - google_secret_manager_secret_version
+  - google_service_account
+  - google_project_iam_member
+restricciones:
+  - la base de datos no tiene IP pública
+  - SSH solo se permite desde 35.235.240.0/20
+  - la contraseña no aparece en el código
+  - la cuenta de servicio de ETL no tiene roles primitivos
+checklist:
+  - La VPC tiene auto_create_subnetworks = false y una subred 10.10.0.0/24 en us-central1
+  - Una regla de firewall permite ingreso solo desde 10.10.0.0/24
+  - Otra regla permite tcp:22 solo desde 35.235.240.0/20; ninguna regla abre 22 ni 3389 a 0.0.0.0/0
+  - Hay un rango reservado (purpose VPC_PEERING) y una conexión de service networking que lo usa
+  - La instancia es POSTGRES_16, db-f1-micro, con ipv4_enabled = false, private_network a la VPC, deletion_protection = false y depends_on a la conexión
+  - El usuario y la versión del secreto toman la contraseña de la misma variable con sensitive = true
+  - La cuenta de servicio tiene roles/cloudsql.client y roles/secretmanager.secretAccessor, y ningún rol primitivo

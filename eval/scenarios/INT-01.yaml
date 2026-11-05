@@ -1,0 +1,40 @@
+# Servicios del catálogo: cloud_run, cloud_sql_postgres, vpc, iam (4)
+id: INT-01
+nivel: intermedio
+titulo: API de inventario con PostgreSQL privado
+requerimiento: >
+  Una pyme de retail quiere llevar su API de inventario a Google Cloud. La API
+  corre en un contenedor que escucha en el puerto 8080 y debe ser accesible
+  públicamente por HTTPS. Los datos se guardan en PostgreSQL, que no debe tener
+  IP pública: solo se accede a través de una red privada propia de la empresa.
+  La API usa una cuenta de servicio propia que solo puede conectarse a la base
+  de datos. Es un entorno de desarrollo y debe ser lo más barato posible.
+  Región: Santiago de Chile.
+contexto:
+  region: southamerica-west1
+  entornos: [dev]
+  puerto: 8080
+servicios_esperados:
+  - google_cloud_run_v2_service
+  - google_cloud_run_v2_service_iam_member
+  - google_sql_database_instance
+  - google_sql_database
+  - google_sql_user
+  - google_compute_global_address
+  - google_service_networking_connection
+  - google_compute_network
+  - google_compute_subnetwork
+  - google_service_account
+  - google_project_iam_member
+restricciones:
+  - la base de datos no tiene IP pública
+  - la contraseña de la base de datos no aparece en el código
+  - la cuenta de servicio de la API no tiene roles primitivos
+checklist:
+  - Cloud Run (v2) en southamerica-west1, invocable por allUsers con roles/run.invoker, y exporta service_url
+  - Cloud Run usa la cuenta de servicio propia y llega a la VPC (vpc_access con Direct VPC egress)
+  - La VPC tiene auto_create_subnetworks = false y una subred explícita en southamerica-west1
+  - Hay un rango reservado (google_compute_global_address con purpose VPC_PEERING) y una conexión de service networking que lo usa
+  - La instancia es POSTGRES_16, db-f1-micro, con ipv4_enabled = false, private_network a la VPC, deletion_protection = false y depends_on a la conexión
+  - Existen una base de datos y un usuario cuya contraseña viene de una variable con sensitive = true
+  - La cuenta de servicio tiene roles/cloudsql.client y ningún rol primitivo

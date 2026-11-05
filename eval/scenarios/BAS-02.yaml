@@ -1,0 +1,26 @@
+# Servicios del catálogo: secret_manager, iam (2)
+id: BAS-02
+nivel: basico
+titulo: Clave de API en Secret Manager con cuenta de solo lectura
+requerimiento: >
+  Nuestro backend se integra con una pasarela de pagos y necesitamos guardar
+  su clave de API en Google Cloud de forma segura, sin que quede escrita en el
+  código. También necesitamos una cuenta de servicio para el backend que solo
+  pueda leer secretos, sin permisos de administración sobre el proyecto.
+  Región: Santiago de Chile.
+contexto:
+  region: southamerica-west1
+  entornos: [dev]
+servicios_esperados:
+  - google_secret_manager_secret
+  - google_secret_manager_secret_version
+  - google_service_account
+  - google_project_iam_member
+restricciones:
+  - el valor del secreto no aparece en el código
+  - la cuenta de servicio solo puede leer secretos
+checklist:
+  - Existe un secreto con replicación automática (replication { auto {} })
+  - La versión del secreto toma su valor de una variable con sensitive = true y sin valor por defecto
+  - Existe una cuenta de servicio dedicada al backend
+  - La cuenta tiene roles/secretmanager.secretAccessor y ningún rol primitivo (owner, editor, viewer)

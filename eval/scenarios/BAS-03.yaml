@@ -1,0 +1,35 @@
+# Servicios del catálogo: cloud_run (1)
+id: BAS-03
+nivel: basico
+titulo: Webhook público de donaciones con escalado acotado
+requerimiento: >
+  Somos una ONG con el equipo técnico en Bélgica. Nuestra plataforma de
+  donaciones envía notificaciones (webhooks) a un pequeño servicio que corre en
+  un contenedor y las registra. El servicio debe tener una URL pública por
+  HTTPS para que la plataforma lo pueda llamar. El tráfico es bajo, así que no
+  debe quedar ninguna instancia encendida cuando no hay solicitudes, y como
+  máximo dos a la vez para controlar el gasto. Necesitamos poder identificar
+  el recurso en la facturación con etiquetas del equipo y del entorno.
+  Región: Bélgica.
+contexto:
+  region: europe-west1
+  entornos: [dev]
+  min_instancias: 0
+  max_instancias: 2
+  memoria: 512Mi
+  etiquetas:
+    equipo: donaciones
+    entorno: dev
+servicios_esperados:
+  - google_cloud_run_v2_service
+  - google_cloud_run_v2_service_iam_member
+restricciones:
+  - el servicio escala a cero y a un máximo de dos instancias
+  - el recurso lleva las etiquetas de equipo y entorno
+checklist:
+  - Cloud Run (v2) en europe-west1 con la imagen de la variable container_image
+  - El servicio es invocable por allUsers con roles/run.invoker
+  - scaling tiene min_instance_count = 0 y max_instance_count = 2
+  - El contenedor tiene un límite de memoria de 512Mi
+  - El servicio tiene las etiquetas equipo = donaciones y entorno = dev
+  - outputs.tf exporta service_url

@@ -1,0 +1,55 @@
+# Servicios del catálogo: cloud_run, cloud_sql_postgres, vpc, cloud_storage, secret_manager, iam (6)
+id: AVA-01
+nivel: avanzado
+titulo: Plataforma de reservas con datos, archivos y secretos privados
+requerimiento: >
+  Somos una empresa de turismo y queremos publicar la API de nuestra plataforma
+  de reservas. La API corre en un contenedor que escucha en el puerto 8080 y
+  debe ser accesible públicamente por HTTPS. Las reservas se guardan en
+  PostgreSQL sin IP pública, dentro de una red privada propia; en esa red solo
+  se permite el tráfico interno entre recursos de la propia subred. Los
+  comprobantes de pago que suben los clientes se guardan en un bucket privado
+  que nunca debe ser público. La contraseña de la base de datos y la clave de
+  API de la pasarela de pagos se guardan en Secret Manager y la API las recibe
+  como variables de entorno. La API usa una cuenta de servicio propia con solo
+  los permisos que necesita: conectarse a la base, leer los secretos y leer y
+  escribir comprobantes. Es un entorno de desarrollo y debe ser lo más barato
+  posible. Región: Santiago de Chile.
+contexto:
+  region: southamerica-west1
+  entornos: [dev]
+  puerto: 8080
+servicios_esperados:
+  - google_cloud_run_v2_service
+  - google_cloud_run_v2_service_iam_member
+  - google_sql_database_instance
+  - google_sql_database
+  - google_sql_user
+  - google_compute_global_address
+  - google_service_networking_connection
+  - google_compute_network
+  - google_compute_subnetwork
+  - google_compute_firewall
+  - google_storage_bucket
+  - google_secret_manager_secret
+  - google_secret_manager_secret_version
+  - google_service_account
+  - google_project_iam_member
+restricciones:
+  - la base de datos no tiene IP pública
+  - el bucket de comprobantes no es público
+  - la red solo admite tráfico interno de la subred
+  - los secretos no aparecen en el código
+  - la cuenta de servicio de la API no tiene roles primitivos
+checklist:
+  - Cloud Run (v2) en southamerica-west1, invocable por allUsers con roles/run.invoker, y exporta service_url
+  - Cloud Run usa la cuenta de servicio propia y llega a la VPC (vpc_access con Direct VPC egress)
+  - Cloud Run lee la contraseña y la clave de la pasarela con env.value_source.secret_key_ref, no como texto plano
+  - La VPC tiene auto_create_subnetworks = false y una subred explícita en southamerica-west1
+  - La regla de firewall admite ingreso solo desde el rango de la subred y no abre 22 ni 3389 a 0.0.0.0/0
+  - Hay un rango reservado (purpose VPC_PEERING) y una conexión de service networking que lo usa
+  - La instancia es POSTGRES_16, db-f1-micro, con ipv4_enabled = false, private_network a la VPC, deletion_protection = false y depends_on a la conexión
+  - Existen una base de datos y un usuario; la contraseña viene de una variable con sensitive = true
+  - El bucket tiene uniform_bucket_level_access = true, public_access_prevention = "enforced", force_destroy = true y nombre con var.project_id como prefijo
+  - Hay dos secretos (contraseña de la base y clave de la pasarela) con replication { auto {} } y versiones cuyo valor viene de variables con sensitive = true
+  - La cuenta de servicio tiene roles/cloudsql.client, roles/secretmanager.secretAccessor y un rol de objetos de Storage (objectUser u objectAdmin), y ningún rol primitivo

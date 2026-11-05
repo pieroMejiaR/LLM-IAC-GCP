@@ -1,0 +1,32 @@
+# Servicios del catálogo: cloud_storage, iam (2)
+id: BAS-04
+nivel: basico
+titulo: Bucket privado de respaldos con ciclo de vida
+requerimiento: >
+  Una cadena de clínicas dentales con sede en Brasil hace respaldos nocturnos
+  de su sistema de citas. Necesitamos un bucket privado para guardarlos, con
+  versionado de objetos por si un respaldo se sobrescribe por error. Para
+  ahorrar, los respaldos con más de 30 días deben pasar a una clase de
+  almacenamiento más barata y los de más de 365 días deben borrarse. El script
+  de respaldo usará una cuenta de servicio propia que solo puede subir
+  archivos: no puede leerlos ni borrarlos. Región: São Paulo.
+contexto:
+  region: southamerica-east1
+  entornos: [dev]
+  dias_cambio_clase: 30
+  clase_destino: NEARLINE
+  dias_retencion: 365
+servicios_esperados:
+  - google_storage_bucket
+  - google_service_account
+  - google_project_iam_member
+restricciones:
+  - el bucket no es público
+  - la cuenta de servicio solo puede crear objetos
+checklist:
+  - Existe un bucket en southamerica-east1 con uniform_bucket_level_access = true y public_access_prevention = "enforced"
+  - El bucket tiene versioning { enabled = true } y force_destroy = true
+  - Una regla de lifecycle cambia la clase a NEARLINE a los 30 días (SetStorageClass)
+  - Otra regla de lifecycle borra los objetos a los 365 días (Delete)
+  - Existe una cuenta de servicio dedicada al script de respaldo
+  - La cuenta tiene roles/storage.objectCreator y ningún rol de lectura, administración ni primitivo

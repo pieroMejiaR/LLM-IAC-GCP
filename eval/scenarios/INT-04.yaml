@@ -1,0 +1,38 @@
+# Servicios del catálogo: cloud_storage (público y privado), cloud_run, iam (3)
+id: INT-04
+nivel: intermedio
+titulo: Tienda en línea con frontend estático, API y portadas privadas
+requerimiento: >
+  Una librería independiente de Montreal lanza su tienda en línea. El frontend
+  es un sitio estático (HTML, JavaScript e imágenes) que debe ser público, con
+  index.html como página principal y 404.html para rutas inexistentes. El
+  catálogo y los pedidos los atiende una API en un contenedor, también pública
+  por HTTPS, que escala como máximo a tres instancias. Las portadas que suben
+  los administradores se guardan en un segundo bucket que no es público; la
+  API las lee y escribe con una cuenta de servicio propia que no tiene otros
+  permisos. Región: Montreal.
+contexto:
+  region: northamerica-northeast1
+  entornos: [dev]
+  max_instancias: 3
+  pagina_principal: index.html
+  pagina_error: 404.html
+servicios_esperados:
+  - google_storage_bucket
+  - google_storage_bucket_iam_member
+  - google_cloud_run_v2_service
+  - google_cloud_run_v2_service_iam_member
+  - google_service_account
+  - google_project_iam_member
+restricciones:
+  - solo el bucket del frontend es público y solo para lectura de objetos
+  - el bucket de portadas no es público
+  - la cuenta de servicio de la API no tiene roles primitivos
+checklist:
+  - El bucket del frontend tiene website con main_page_suffix = "index.html" y not_found_page = "404.html"
+  - Los objetos del frontend son legibles por allUsers con roles/storage.objectViewer
+  - El bucket de portadas tiene public_access_prevention = "enforced" y ningún binding a allUsers
+  - Ambos buckets están en northamerica-northeast1 con uniform_bucket_level_access = true, force_destroy = true y nombres con var.project_id como prefijo
+  - Cloud Run (v2) es invocable por allUsers, usa la cuenta de servicio propia y tiene max_instance_count = 3
+  - La cuenta de servicio tiene un rol de objetos de Storage (objectUser u objectAdmin) y ningún rol primitivo
+  - outputs.tf exporta service_url

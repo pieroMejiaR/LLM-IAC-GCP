@@ -1,0 +1,54 @@
+# Servicios del catálogo: cloud_run (público y privado), cloud_sql_postgres, vpc, cloud_storage, iam (5)
+id: AVA-02
+nivel: avanzado
+titulo: Agenda veterinaria con API pública y procesador interno
+requerimiento: >
+  Una cadena de clínicas veterinarias de Texas y el norte de México moderniza
+  su sistema de citas. Tiene dos contenedores: una API de agenda, pública por
+  HTTPS y con hasta cuatro instancias, y un procesador interno que envía
+  recordatorios y que no debe ser público: solo lo puede invocar la API. Cada
+  uno usa su propia cuenta de servicio con permisos mínimos. Ambos guardan los
+  datos en PostgreSQL sin IP pública, dentro de una red privada propia con
+  subred 10.20.0.0/24 donde solo se admite tráfico interno de la subred. Las
+  radiografías de las mascotas se guardan en un bucket privado con versionado
+  que solo la API puede leer y escribir. Los recursos llevan la etiqueta del
+  centro de costos. Región: Dallas (us-south1).
+contexto:
+  region: us-south1
+  entornos: [dev]
+  rango_subred: 10.20.0.0/24
+  max_instancias_api: 4
+  max_instancias_procesador: 1
+  etiquetas:
+    centro_costos: clinicas
+servicios_esperados:
+  - google_cloud_run_v2_service
+  - google_cloud_run_v2_service_iam_member
+  - google_sql_database_instance
+  - google_sql_database
+  - google_sql_user
+  - google_compute_global_address
+  - google_service_networking_connection
+  - google_compute_network
+  - google_compute_subnetwork
+  - google_compute_firewall
+  - google_storage_bucket
+  - google_service_account
+  - google_project_iam_member
+restricciones:
+  - solo la API de agenda es invocable por allUsers
+  - la base de datos no tiene IP pública
+  - el bucket de radiografías no es público
+  - la red solo admite tráfico interno de la subred
+  - las cuentas de servicio no tienen roles primitivos
+checklist:
+  - Hay dos servicios Cloud Run (v2) en us-south1; solo la API tiene binding a allUsers con roles/run.invoker
+  - La API tiene max_instance_count = 4 y el procesador max_instance_count = 1
+  - Cada servicio usa su propia cuenta de servicio y llega a la VPC (vpc_access con Direct VPC egress)
+  - La VPC tiene auto_create_subnetworks = false, subred 10.20.0.0/24 en us-south1 y una regla de firewall que admite ingreso solo desde ese rango
+  - Hay un rango reservado (purpose VPC_PEERING) y una conexión de service networking que lo usa
+  - La instancia es POSTGRES_16, db-f1-micro, con ipv4_enabled = false, private_network a la VPC, deletion_protection = false y depends_on a la conexión; la contraseña viene de una variable con sensitive = true
+  - El bucket tiene versioning habilitado, public_access_prevention = "enforced", uniform_bucket_level_access = true y force_destroy = true
+  - La cuenta de la API tiene roles/cloudsql.client, un rol de objetos de Storage y roles/run.invoker; la del procesador solo roles/cloudsql.client; ninguna tiene roles primitivos
+  - Los servicios Cloud Run, la instancia y el bucket llevan la etiqueta centro_costos = clinicas
+  - outputs.tf exporta service_url con la URL de la API
