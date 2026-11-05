@@ -51,7 +51,9 @@ def _guardar(res: ResultadoCorrida, salida: Path) -> Path:
 
 
 def _resumen(res: ResultadoCorrida) -> str:
-    return (f"validate={'ok' if res.validate_ok else 'falla'}  plan={'ok' if res.plan_ok else 'falla/omitido'}  "
+    control_plan = res.validacion.control("plan") if res.validacion else None
+    plan = "ok" if res.plan_ok else ("omitido" if control_plan and control_plan.omitido else "falla")
+    return (f"validate={'ok' if res.validate_ok else 'falla'}  plan={plan}  "
             f"reparaciones={res.intentos}  checkov={res.checkov_fallidas}  tiempo={res.tiempo_s:.1f}s  "
             f"tokens={res.tokens_entrada}+{res.tokens_salida}  costo=${res.costo_usd:.4f}"
             + (f"\nerror ({res.tipo_error}): {res.error_final}" if res.error_final else ""))
