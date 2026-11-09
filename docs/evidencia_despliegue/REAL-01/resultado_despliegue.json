@@ -1,0 +1,92 @@
+{
+  "estado": "desplegado",
+  "motivo": "",
+  "cambios": [
+    {
+      "direccion": "google_service_account.run",
+      "tipo": "google_service_account",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_project_iam_member.sql_client",
+      "tipo": "google_project_iam_member",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_project_iam_member.secret_accessor",
+      "tipo": "google_project_iam_member",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_sql_database_instance.db",
+      "tipo": "google_sql_database_instance",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_sql_database.picanteria",
+      "tipo": "google_sql_database",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_sql_user.picanteria",
+      "tipo": "google_sql_user",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_secret_manager_secret.database_url",
+      "tipo": "google_secret_manager_secret",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_secret_manager_secret_version.database_url",
+      "tipo": "google_secret_manager_secret_version",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_secret_manager_secret.admin_password",
+      "tipo": "google_secret_manager_secret",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_secret_manager_secret_version.admin_password",
+      "tipo": "google_secret_manager_secret_version",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_cloud_run_v2_service.api",
+      "tipo": "google_cloud_run_v2_service",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_cloud_run_v2_service_iam_member.api_publico",
+      "tipo": "google_cloud_run_v2_service_iam_member",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_cloud_run_v2_service.web",
+      "tipo": "google_cloud_run_v2_service",
+      "acciones": ["create"]
+    },
+    {
+      "direccion": "google_cloud_run_v2_service_iam_member.web_publico",
+      "tipo": "google_cloud_run_v2_service_iam_member",
+      "acciones": ["create"]
+    }
+  ],
+  "aprobado": true,
+  "aplicado": true,
+  "prueba_http": {
+    "url": "https://picanteria-web-4a78-uc.a.run.app",
+    "codigo": 200,
+    "latencia_ms": 142,
+    "intentos": 1,
+    "ok": true
+  },
+  "destruido": false,
+  "directorio": "resultados/despliegue/REAL-01/T1-run-001",
+  "duraciones_s": {
+    "plan": 38.4,
+    "apply": 342.1,
+    "prueba_http": 1.2
+  }
+}

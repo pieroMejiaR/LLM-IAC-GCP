@@ -1,0 +1,7 @@
+{
+  "url": "https://picanteria-web-4a78-uc.a.run.app",
+  "codigo": 200,
+  "latencia_ms": 142,
+  "intentos": 1,
+  "ok": true
+}
