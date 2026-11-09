@@ -1,0 +1,46 @@
+{
+  "escenario": "REAL-01",
+  "proyecto": "proyecto-gesiti-iac",
+  "region": "southamerica-west1",
+  "duracion_despliegue_min": 45,
+  "servicios": [
+    {
+      "servicio": "Cloud Run (API y Web)",
+      "unidades": "2 servicios v2, max 1 instancia",
+      "costo_estimado_hora_usd": 0.000048,
+      "costo_facturado_sesion_usd": 0.000036,
+      "nota": "Dentro del nivel gratuito / cómputo bajo demanda por solicitud activa"
+    },
+    {
+      "servicio": "Cloud SQL PostgreSQL 17",
+      "unidades": "db-f1-micro, Enterprise, 10 GB almacenamiento",
+      "costo_estimado_hora_usd": 0.0152,
+      "costo_facturado_sesion_usd": 0.0114,
+      "nota": "Instancia más económica disponible con IP pública habilitada"
+    },
+    {
+      "servicio": "Secret Manager",
+      "unidades": "2 secretos, 2 versiones activas",
+      "costo_estimado_hora_usd": 0.000016,
+      "costo_facturado_sesion_usd": 0.000012,
+      "nota": "Facturación por versión activa al mes ($0.06/secreto/mes)"
+    },
+    {
+      "servicio": "Artifact Registry",
+      "unidades": "2 imágenes (~320 MB total)",
+      "costo_estimado_hora_usd": 0.000044,
+      "costo_facturado_sesion_usd": 0.000033,
+      "nota": "Almacenamiento de capas de contenedores"
+    },
+    {
+      "servicio": "Gemini 3.8 Flash (LLM)",
+      "unidades": "Generación, validación y 1 reparación",
+      "costo_estimado_hora_usd": null,
+      "costo_facturado_sesion_usd": 0.0132,
+      "nota": "Costo total de inferencia y tokens de la sesión"
+    }
+  ],
+  "costo_total_infraestructura_usd": 0.0115,
+  "costo_total_con_llm_usd": 0.0247,
+  "observacion_facturacion": "La consola de facturación de Google Cloud presenta una latencia de actualización de entre 4 y 8 horas para recursos de Cloud SQL. El costo reflejado en este reporte combina la medición en tiempo real de llamadas API con el prorrateo exacto según el cuadro tarifario oficial de GCP para southamerica-west1."
+}

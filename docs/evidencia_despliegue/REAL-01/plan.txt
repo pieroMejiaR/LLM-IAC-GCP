@@ -1,0 +1,224 @@
+Terraform used the selected providers to generate the following execution plan.
+Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # google_cloud_run_v2_service.api will be created
+  + resource "google_cloud_run_v2_service" "api" {
+      + client               = (known after apply)
+      + client_version       = (known after apply)
+      + create_time          = (known after apply)
+      + creator              = (known after apply)
+      + deletion_protection  = false
+      + effective_annotations = (known after apply)
+      + effective_labels     = (known after apply)
+      + etag                 = (known after apply)
+      + expire_time          = (known after apply)
+      + id                   = (known after apply)
+      + ingress              = "INGRESS_TRAFFIC_ALL"
+      + latest_created_revision = (known after apply)
+      + latest_ready_revision = (known after apply)
+      + launch_stage         = (known after apply)
+      + location             = "southamerica-west1"
+      + name                 = "picanteria-api"
+      + project              = "proyecto-gesiti-iac"
+      + reconcile_condition  = (known after apply)
+      + terraform_labels     = (known after apply)
+      + uid                  = (known after apply)
+      + uri                  = (known after apply)
+
+      + template {
+          + max_instance_request_concurrency = (known after apply)
+          + service_account                  = (known after apply)
+          + timeout                          = (known after apply)
+
+          + containers {
+              + image = "southamerica-west1-docker.pkg.dev/proyecto-gesiti-iac/apps/picanteria-api:v1"
+              + name  = (known after apply)
+
+              + env {
+                  + name  = "COOKIE_SECURE"
+                  + value = "true"
+                }
+              + env {
+                  + name  = "INITIAL_ADMIN_USERNAME"
+                  + value = "admin"
+                }
+              + env {
+                  + name = "DATABASE_URL"
+                  + value_source {
+                      + secret_key_ref {
+                          + secret  = "picanteria-database-url"
+                          + version = "latest"
+                        }
+                    }
+                }
+              + env {
+                  + name = "INITIAL_ADMIN_PASSWORD"
+                  + value_source {
+                      + secret_key_ref {
+                          + secret  = "picanteria-admin-password"
+                          + version = "latest"
+                        }
+                    }
+                }
+
+              + ports {
+                  + container_port = 3000
+                }
+
+              + volume_mounts {
+                  + mount_path = "/cloudsql"
+                  + name       = "cloudsql"
+                }
+            }
+
+          + scaling {
+              + max_instance_count = 1
+              + min_instance_count = 0
+            }
+
+          + volumes {
+              + name = "cloudsql"
+              + cloud_sql_instance {
+                  + instances = [
+                      + "proyecto-gesiti-iac:southamerica-west1:picanteria-db-1107",
+                    ]
+                }
+            }
+        }
+    }
+
+  # google_cloud_run_v2_service.web will be created
+  + resource "google_cloud_run_v2_service" "web" {
+      + deletion_protection  = false
+      + ingress              = "INGRESS_TRAFFIC_ALL"
+      + location             = "southamerica-west1"
+      + name                 = "picanteria-web"
+      + project              = "proyecto-gesiti-iac"
+      + uri                  = (known after apply)
+
+      + template {
+          + service_account = (known after apply)
+          + containers {
+              + image = "southamerica-west1-docker.pkg.dev/proyecto-gesiti-iac/apps/picanteria-web:v1"
+              + ports {
+                  + container_port = 80
+                }
+              + env {
+                  + name  = "API_URL"
+                  + value = (known after apply)
+                }
+            }
+          + scaling {
+              + max_instance_count = 1
+            }
+        }
+    }
+
+  # google_cloud_run_v2_service_iam_member.api_publico will be created
+  + resource "google_cloud_run_v2_service_iam_member" "api_publico" {
+      + location = "southamerica-west1"
+      + member   = "allUsers"
+      + name     = "picanteria-api"
+      + role     = "roles/run.invoker"
+    }
+
+  # google_cloud_run_v2_service_iam_member.web_publico will be created
+  + resource "google_cloud_run_v2_service_iam_member" "web_publico" {
+      + location = "southamerica-west1"
+      + member   = "allUsers"
+      + name     = "picanteria-web"
+      + role     = "roles/run.invoker"
+    }
+
+  # google_project_iam_member.secret_accessor will be created
+  + resource "google_project_iam_member" "secret_accessor" {
+      + member  = (known after apply)
+      + project = "proyecto-gesiti-iac"
+      + role    = "roles/secretmanager.secretAccessor"
+    }
+
+  # google_project_iam_member.sql_client will be created
+  + resource "google_project_iam_member" "sql_client" {
+      + member  = (known after apply)
+      + project = "proyecto-gesiti-iac"
+      + role    = "roles/cloudsql.client"
+    }
+
+  # google_secret_manager_secret.admin_password will be created
+  + resource "google_secret_manager_secret" "admin_password" {
+      + project   = "proyecto-gesiti-iac"
+      + secret_id = "picanteria-admin-password"
+      + replication {
+          + auto {}
+        }
+    }
+
+  # google_secret_manager_secret.database_url will be created
+  + resource "google_secret_manager_secret" "database_url" {
+      + project   = "proyecto-gesiti-iac"
+      + secret_id = "picanteria-database-url"
+      + replication {
+          + auto {}
+        }
+    }
+
+  # google_secret_manager_secret_version.admin_password will be created
+  + resource "google_secret_manager_secret_version" "admin_password" {
+      + secret      = (known after apply)
+      + secret_data = (sensitive value)
+    }
+
+  # google_secret_manager_secret_version.database_url will be created
+  + resource "google_secret_manager_secret_version" "database_url" {
+      + secret      = (known after apply)
+      + secret_data = (sensitive value)
+    }
+
+  # google_service_account.run will be created
+  + resource "google_service_account" "run" {
+      + account_id   = "picanteria-run"
+      + display_name = "Cuenta de Cloud Run de la picantería"
+      + project      = "proyecto-gesiti-iac"
+    }
+
+  # google_sql_database.picanteria will be created
+  + resource "google_sql_database" "picanteria" {
+      + instance = "picanteria-db-1107"
+      + name     = "picanteria"
+      + project  = "proyecto-gesiti-iac"
+    }
+
+  # google_sql_database_instance.db will be created
+  + resource "google_sql_database_instance" "db" {
+      + connection_name     = (known after apply)
+      + database_version    = "POSTGRES_17"
+      + deletion_protection = false
+      + name                = "picanteria-db-1107"
+      + project             = "proyecto-gesiti-iac"
+      + region              = "southamerica-west1"
+
+      + settings {
+          + edition = "ENTERPRISE"
+          + tier    = "db-f1-micro"
+          + ip_configuration {
+              + ipv4_enabled = true
+            }
+        }
+    }
+
+  # google_sql_user.picanteria will be created
+  + resource "google_sql_user" "picanteria" {
+      + instance = "picanteria-db-1107"
+      + name     = "picanteria"
+      + password = (sensitive value)
+      + project  = "proyecto-gesiti-iac"
+    }
+
+Plan: 14 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + api_url     = (known after apply)
+  + service_url = (known after apply)
