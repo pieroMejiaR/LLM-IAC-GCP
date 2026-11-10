@@ -4,9 +4,8 @@
 
 ---
 
-**ASIGNATURA:** Gestión de Sistemas y Tecnologías de Información  
+**ASIGNATURA:** Tópicos Avanzados en Ingeniería de Software  
 **SEMESTRE ACADÉMICO:** 2026-B (X Semestre)  
-**DOCENTE:** Mg. Roberto Carlos Espinoza Ccama  
 
 ---
 
