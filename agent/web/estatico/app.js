@@ -485,6 +485,16 @@
     const formulario = el("form", { class: "formulario", onsubmit: (e) => {
       e.preventDefault();
       const ficha = estado.proyecto;
+      // El texto dice que adjunta la carpeta, pero no hay ninguna: sin ella el agente no conoce la aplicación.
+      const mencionaCarpeta = /adjunt|carpeta\s+(del|de\s+(mi|la|nuestr[oa]))\s+(sistema|aplicaci|proyecto|programa)/i;
+      if (!ficha && mencionaCarpeta.test(campo.value) && estado.avisoCarpeta !== campo.value) {
+        estado.avisoCarpeta = campo.value;      // se avisa una vez: si insiste con el mismo texto, se envía
+        estado.error = "Su texto menciona la carpeta de la aplicación, pero todavía no adjuntó ninguna. Use el botón "
+          + "«Adjuntar la carpeta de mi aplicación», debajo del texto. Si no la necesita, presione otra vez "
+          + "«Analizar requerimiento».";
+        render();
+        return;
+      }
       enviar(async () => {
         const r = await api("/api/sesiones", { requerimiento: campo.value, region: region.value, proyecto: ficha ? ficha.id : null });
         estado.proyecto = null;
@@ -529,7 +539,10 @@
       e.preventDefault();
       if (!campo.value.trim()) { estado.error = "Escriba qué quiere cambiar, o apruebe la revisión."; render(); return; }
       enviar(() => api(`/api/sesiones/${s.id}/correcciones`, { texto: campo.value }));
-    } }, campo, el("div", { class: "fila-acciones" }, pedir, contador), aprobar);
+    } }, campo, el("div", { class: "fila-acciones" }, pedir, contador), aprobar,
+    el("div", { class: "fila-acciones" },
+      el("button", { class: "boton secundario chico", type: "button", disabled: estado.enviando,
+        text: "Descartar y empezar de nuevo", onclick: nuevoRequerimiento })));
     campo.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) formulario.requestSubmit();
     });
