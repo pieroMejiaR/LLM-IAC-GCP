@@ -1,0 +1,19 @@
+google_cloud_run_v2_service.api: Creating...
+google_cloud_run_v2_service.api: Still creating... [00m10s elapsed]
+google_cloud_run_v2_service.api: Still creating... [00m20s elapsed]
+google_cloud_run_v2_service.api: Still creating... [00m30s elapsed]
+google_cloud_run_v2_service.api: Still creating... [00m40s elapsed]
+google_cloud_run_v2_service.api: Creation complete after 42s [id=projects/agente-iac-pm/locations/southamerica-west1/services/api]
+google_cloud_run_v2_service_iam_member.api_public: Creating...
+google_cloud_run_v2_service.web: Creating...
+google_cloud_run_v2_service_iam_member.api_public: Creation complete after 5s [id=projects/agente-iac-pm/locations/southamerica-west1/services/api/roles/run.invoker/allUsers]
+google_cloud_run_v2_service.web: Still creating... [00m10s elapsed]
+google_cloud_run_v2_service.web: Creation complete after 11s [id=projects/agente-iac-pm/locations/southamerica-west1/services/web]
+google_cloud_run_v2_service_iam_member.web_public: Creating...
+google_cloud_run_v2_service_iam_member.web_public: Creation complete after 5s [id=projects/agente-iac-pm/locations/southamerica-west1/services/web/roles/run.invoker/allUsers]
+
+Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+service_url = "https://web-y2zz3fattq-tl.a.run.app"

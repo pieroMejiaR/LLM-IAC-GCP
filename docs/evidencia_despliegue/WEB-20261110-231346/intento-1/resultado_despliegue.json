@@ -1,0 +1,134 @@
+{
+  "estado": "fallo_apply",
+  "motivo": "(apply) main.tf:104 Error: Error creating Service: googleapi: Error 403: Permission 'artifactregistry.repositories.downloadArtifacts' denied on resource '//artifactregistry.googleapis.com/projects/agente-iac-pm/locations/southamerica-west1/repositories/apps' (or it may not exist). Remediate access with this Troubleshooter URL or share it with your administrator - https://console.cloud.google.com/iam-admin/troubleshooter/summary;errorId=CiQwMWExYzdjNC1mNjM5LTdlZDEtYjczZS02OTMwMDdlMmUyN2QSRXByb2plY3RzL2FnZW50ZS1pYWMtcG0vbG9jYXRpb25zL3NvdXRoYW1lcmljYS13ZXN0MS9yZXBvc2l0b3JpZXMvYXBwcw%!D(MISSING)%!D(MISSING) . with go Recursos conservados. Para destruirlos: python -m agent destruir resultados/web/WEB-20261110-231346/T1-a55e30733e32/despliegue",
+  "cambios": [
+    {
+      "direccion": "google_cloud_run_v2_service.api",
+      "tipo": "google_cloud_run_v2_service",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_cloud_run_v2_service.web",
+      "tipo": "google_cloud_run_v2_service",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_cloud_run_v2_service_iam_member.api_public",
+      "tipo": "google_cloud_run_v2_service_iam_member",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_cloud_run_v2_service_iam_member.web_public",
+      "tipo": "google_cloud_run_v2_service_iam_member",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_project_iam_member.sa_api_cloudsql",
+      "tipo": "google_project_iam_member",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_project_iam_member.sa_api_secrets",
+      "tipo": "google_project_iam_member",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_secret_manager_secret.admin_password",
+      "tipo": "google_secret_manager_secret",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_secret_manager_secret.database_url",
+      "tipo": "google_secret_manager_secret",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_secret_manager_secret.db_password",
+      "tipo": "google_secret_manager_secret",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_secret_manager_secret_version.admin_password",
+      "tipo": "google_secret_manager_secret_version",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_secret_manager_secret_version.database_url",
+      "tipo": "google_secret_manager_secret_version",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_secret_manager_secret_version.db_password",
+      "tipo": "google_secret_manager_secret_version",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_service_account.sa_api",
+      "tipo": "google_service_account",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_service_account.sa_web",
+      "tipo": "google_service_account",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_sql_database.db",
+      "tipo": "google_sql_database",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_sql_database_instance.db",
+      "tipo": "google_sql_database_instance",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_sql_user.user",
+      "tipo": "google_sql_user",
+      "acciones": [
+        "create"
+      ]
+    }
+  ],
+  "aprobado": true,
+  "aplicado": false,
+  "prueba_http": {},
+  "destruido": false,
+  "directorio": "resultados/web/WEB-20261110-231346/T1-a55e30733e32/despliegue",
+  "duraciones_s": {
+    "plan": 2.97,
+    "apply": 330.85
+  }
+}

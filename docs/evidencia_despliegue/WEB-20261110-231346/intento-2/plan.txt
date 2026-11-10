@@ -1,0 +1,216 @@
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # google_cloud_run_v2_service.api will be created
+  + resource "google_cloud_run_v2_service" "api" {
+      + conditions              = (known after apply)
+      + create_time             = (known after apply)
+      + creator                 = (known after apply)
+      + delete_time             = (known after apply)
+      + deletion_policy         = "DELETE"
+      + deletion_protection     = false
+      + effective_annotations   = (known after apply)
+      + effective_labels        = {
+          + "goog-terraform-provisioned" = "true"
+        }
+      + etag                    = (known after apply)
+      + expire_time             = (known after apply)
+      + generation              = (known after apply)
+      + id                      = (known after apply)
+      + ingress                 = (known after apply)
+      + last_modifier           = (known after apply)
+      + latest_created_revision = (known after apply)
+      + latest_ready_revision   = (known after apply)
+      + launch_stage            = (known after apply)
+      + location                = "southamerica-west1"
+      + name                    = "api"
+      + observed_generation     = (known after apply)
+      + project                 = "agente-iac-pm"
+      + reconciling             = (known after apply)
+      + terminal_condition      = (known after apply)
+      + terraform_labels        = {
+          + "goog-terraform-provisioned" = "true"
+        }
+      + traffic_statuses        = (known after apply)
+      + uid                     = (known after apply)
+      + update_time             = (known after apply)
+      + uri                     = (known after apply)
+      + urls                    = (known after apply)
+
+      + scaling (known after apply)
+
+      + template {
+          + max_instance_request_concurrency = (known after apply)
+          + service_account                  = "sa-api@agente-iac-pm.iam.gserviceaccount.com"
+          + timeout                          = (known after apply)
+
+          + containers {
+              + build_info = (known after apply)
+              + image      = "southamerica-west1-docker.pkg.dev/agente-iac-pm/apps/picanteria-api:v1"
+
+              + env {
+                  + name  = "COOKIE_SECURE"
+                  + value = "true"
+                }
+              + env {
+                  + name  = "DATABASE_URL"
+                    # (1 unchanged attribute hidden)
+
+                  + value_source {
+                      + secret_key_ref {
+                          + secret  = "secret-database-url"
+                          + version = "latest"
+                        }
+                    }
+                }
+              + env {
+                  + name  = "INITIAL_ADMIN_PASSWORD"
+                    # (1 unchanged attribute hidden)
+
+                  + value_source {
+                      + secret_key_ref {
+                          + secret  = "secret-admin-password"
+                          + version = "latest"
+                        }
+                    }
+                }
+              + env {
+                  + name  = "INITIAL_ADMIN_USERNAME"
+                  + value = "admin"
+                }
+
+              + ports {
+                  + container_port = 3000
+                  + name           = (known after apply)
+                }
+
+              + resources (known after apply)
+
+              + startup_probe (known after apply)
+
+              + volume_mounts {
+                  + mount_path = "/cloudsql"
+                  + name       = "cloudsql"
+                }
+            }
+
+          + scaling {
+              + max_instance_count = 2
+              + min_instance_count = 0
+            }
+
+          + volumes {
+              + name = "cloudsql"
+
+              + cloud_sql_instance {
+                  + instances = [
+                      + "agente-iac-pm:southamerica-west1:picanteria-db",
+                    ]
+                }
+            }
+        }
+
+      + traffic (known after apply)
+    }
+
+  # google_cloud_run_v2_service.web will be created
+  + resource "google_cloud_run_v2_service" "web" {
+      + conditions              = (known after apply)
+      + create_time             = (known after apply)
+      + creator                 = (known after apply)
+      + delete_time             = (known after apply)
+      + deletion_policy         = "DELETE"
+      + deletion_protection     = false
+      + effective_annotations   = (known after apply)
+      + effective_labels        = {
+          + "goog-terraform-provisioned" = "true"
+        }
+      + etag                    = (known after apply)
+      + expire_time             = (known after apply)
+      + generation              = (known after apply)
+      + id                      = (known after apply)
+      + ingress                 = (known after apply)
+      + last_modifier           = (known after apply)
+      + latest_created_revision = (known after apply)
+      + latest_ready_revision   = (known after apply)
+      + launch_stage            = (known after apply)
+      + location                = "southamerica-west1"
+      + name                    = "web"
+      + observed_generation     = (known after apply)
+      + project                 = "agente-iac-pm"
+      + reconciling             = (known after apply)
+      + terminal_condition      = (known after apply)
+      + terraform_labels        = {
+          + "goog-terraform-provisioned" = "true"
+        }
+      + traffic_statuses        = (known after apply)
+      + uid                     = (known after apply)
+      + update_time             = (known after apply)
+      + uri                     = (known after apply)
+      + urls                    = (known after apply)
+
+      + scaling (known after apply)
+
+      + template {
+          + max_instance_request_concurrency = (known after apply)
+          + service_account                  = "sa-web@agente-iac-pm.iam.gserviceaccount.com"
+          + timeout                          = (known after apply)
+
+          + containers {
+              + build_info = (known after apply)
+              + image      = "southamerica-west1-docker.pkg.dev/agente-iac-pm/apps/picanteria-web:v1"
+
+              + env {
+                  + name  = "API_URL"
+                  + value = (known after apply)
+                }
+
+              + ports {
+                  + container_port = 8080
+                  + name           = (known after apply)
+                }
+
+              + resources (known after apply)
+
+              + startup_probe (known after apply)
+            }
+
+          + scaling {
+              + max_instance_count = 2
+              + min_instance_count = 0
+            }
+        }
+
+      + traffic (known after apply)
+    }
+
+  # google_cloud_run_v2_service_iam_member.api_public will be created
+  + resource "google_cloud_run_v2_service_iam_member" "api_public" {
+      + etag     = (known after apply)
+      + id       = (known after apply)
+      + location = "southamerica-west1"
+      + member   = "allUsers"
+      + name     = "api"
+      + project  = (known after apply)
+      + role     = "roles/run.invoker"
+    }
+
+  # google_cloud_run_v2_service_iam_member.web_public will be created
+  + resource "google_cloud_run_v2_service_iam_member" "web_public" {
+      + etag     = (known after apply)
+      + id       = (known after apply)
+      + location = "southamerica-west1"
+      + member   = "allUsers"
+      + name     = "web"
+      + project  = (known after apply)
+      + role     = "roles/run.invoker"
+    }
+
+Plan: 4 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + service_url = (known after apply)

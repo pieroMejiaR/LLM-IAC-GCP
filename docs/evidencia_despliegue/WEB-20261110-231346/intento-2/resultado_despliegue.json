@@ -1,0 +1,141 @@
+{
+  "estado": "desplegado",
+  "motivo": "Recursos conservados. Para destruirlos: python -m agent destruir resultados/web/WEB-20261110-231346/T1-a55e30733e32/despliegue",
+  "cambios": [
+    {
+      "direccion": "google_cloud_run_v2_service.api",
+      "tipo": "google_cloud_run_v2_service",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_cloud_run_v2_service.web",
+      "tipo": "google_cloud_run_v2_service",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_cloud_run_v2_service_iam_member.api_public",
+      "tipo": "google_cloud_run_v2_service_iam_member",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_cloud_run_v2_service_iam_member.web_public",
+      "tipo": "google_cloud_run_v2_service_iam_member",
+      "acciones": [
+        "create"
+      ]
+    },
+    {
+      "direccion": "google_project_iam_member.sa_api_cloudsql",
+      "tipo": "google_project_iam_member",
+      "acciones": [
+        "no-op"
+      ]
+    },
+    {
+      "direccion": "google_project_iam_member.sa_api_secrets",
+      "tipo": "google_project_iam_member",
+      "acciones": [
+        "no-op"
+      ]
+    },
+    {
+      "direccion": "google_secret_manager_secret.admin_password",
+      "tipo": "google_secret_manager_secret",
+      "acciones": [
+        "no-op"
+      ]
+    },
+    {
+      "direccion": "google_secret_manager_secret.database_url",
+      "tipo": "google_secret_manager_secret",
+      "acciones": [
+        "no-op"
+      ]
+    },
+    {
+      "direccion": "google_secret_manager_secret.db_password",
+      "tipo": "google_secret_manager_secret",
+      "acciones": [
+        "no-op"
+      ]
+    },
+    {
+      "direccion": "google_secret_manager_secret_version.admin_password",
+      "tipo": "google_secret_manager_secret_version",
+      "acciones": [
+        "no-op"
+      ]
+    },
+    {
+      "direccion": "google_secret_manager_secret_version.database_url",
+      "tipo": "google_secret_manager_secret_version",
+      "acciones": [
+        "no-op"
+      ]
+    },
+    {
+      "direccion": "google_secret_manager_secret_version.db_password",
+      "tipo": "google_secret_manager_secret_version",
+      "acciones": [
+        "no-op"
+      ]
+    },
+    {
+      "direccion": "google_service_account.sa_api",
+      "tipo": "google_service_account",
+      "acciones": [
+        "no-op"
+      ]
+    },
+    {
+      "direccion": "google_service_account.sa_web",
+      "tipo": "google_service_account",
+      "acciones": [
+        "no-op"
+      ]
+    },
+    {
+      "direccion": "google_sql_database.db",
+      "tipo": "google_sql_database",
+      "acciones": [
+        "no-op"
+      ]
+    },
+    {
+      "direccion": "google_sql_database_instance.db",
+      "tipo": "google_sql_database_instance",
+      "acciones": [
+        "no-op"
+      ]
+    },
+    {
+      "direccion": "google_sql_user.user",
+      "tipo": "google_sql_user",
+      "acciones": [
+        "no-op"
+      ]
+    }
+  ],
+  "aprobado": true,
+  "aplicado": true,
+  "prueba_http": {
+    "url": "https://web-y2zz3fattq-tl.a.run.app",
+    "codigo": 200,
+    "latencia_ms": 513,
+    "intentos": 1,
+    "ok": true
+  },
+  "destruido": false,
+  "directorio": "resultados/web/WEB-20261110-231346/T1-a55e30733e32/despliegue",
+  "duraciones_s": {
+    "plan": 6.53,
+    "apply": 58.89,
+    "prueba_http": 0.51
+  }
+}

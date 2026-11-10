@@ -1,0 +1,479 @@
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # google_cloud_run_v2_service.api will be created
+  + resource "google_cloud_run_v2_service" "api" {
+      + conditions              = (known after apply)
+      + create_time             = (known after apply)
+      + creator                 = (known after apply)
+      + delete_time             = (known after apply)
+      + deletion_policy         = "DELETE"
+      + deletion_protection     = false
+      + effective_annotations   = (known after apply)
+      + effective_labels        = {
+          + "goog-terraform-provisioned" = "true"
+        }
+      + etag                    = (known after apply)
+      + expire_time             = (known after apply)
+      + generation              = (known after apply)
+      + id                      = (known after apply)
+      + ingress                 = (known after apply)
+      + last_modifier           = (known after apply)
+      + latest_created_revision = (known after apply)
+      + latest_ready_revision   = (known after apply)
+      + launch_stage            = (known after apply)
+      + location                = "southamerica-west1"
+      + name                    = "api"
+      + observed_generation     = (known after apply)
+      + project                 = "agente-iac-pm"
+      + reconciling             = (known after apply)
+      + terminal_condition      = (known after apply)
+      + terraform_labels        = {
+          + "goog-terraform-provisioned" = "true"
+        }
+      + traffic_statuses        = (known after apply)
+      + uid                     = (known after apply)
+      + update_time             = (known after apply)
+      + uri                     = (known after apply)
+      + urls                    = (known after apply)
+
+      + scaling (known after apply)
+
+      + template {
+          + max_instance_request_concurrency = (known after apply)
+          + service_account                  = "sa-api@agente-iac-pm.iam.gserviceaccount.com"
+          + timeout                          = (known after apply)
+
+          + containers {
+              + build_info = (known after apply)
+              + image      = "southamerica-west1-docker.pkg.dev/agente-iac-pm/apps/picanteria-api:v1"
+
+              + env {
+                  + name  = "COOKIE_SECURE"
+                  + value = "true"
+                }
+              + env {
+                  + name  = "DATABASE_URL"
+                    # (1 unchanged attribute hidden)
+
+                  + value_source {
+                      + secret_key_ref {
+                          + secret  = "secret-database-url"
+                          + version = "latest"
+                        }
+                    }
+                }
+              + env {
+                  + name  = "INITIAL_ADMIN_PASSWORD"
+                    # (1 unchanged attribute hidden)
+
+                  + value_source {
+                      + secret_key_ref {
+                          + secret  = "secret-admin-password"
+                          + version = "latest"
+                        }
+                    }
+                }
+              + env {
+                  + name  = "INITIAL_ADMIN_USERNAME"
+                  + value = "admin"
+                }
+
+              + ports {
+                  + container_port = 3000
+                  + name           = (known after apply)
+                }
+
+              + resources (known after apply)
+
+              + startup_probe (known after apply)
+
+              + volume_mounts {
+                  + mount_path = "/cloudsql"
+                  + name       = "cloudsql"
+                }
+            }
+
+          + scaling {
+              + max_instance_count = 2
+              + min_instance_count = 0
+            }
+
+          + volumes {
+              + name = "cloudsql"
+
+              + cloud_sql_instance {
+                  + instances = (known after apply)
+                }
+            }
+        }
+
+      + traffic (known after apply)
+    }
+
+  # google_cloud_run_v2_service.web will be created
+  + resource "google_cloud_run_v2_service" "web" {
+      + conditions              = (known after apply)
+      + create_time             = (known after apply)
+      + creator                 = (known after apply)
+      + delete_time             = (known after apply)
+      + deletion_policy         = "DELETE"
+      + deletion_protection     = false
+      + effective_annotations   = (known after apply)
+      + effective_labels        = {
+          + "goog-terraform-provisioned" = "true"
+        }
+      + etag                    = (known after apply)
+      + expire_time             = (known after apply)
+      + generation              = (known after apply)
+      + id                      = (known after apply)
+      + ingress                 = (known after apply)
+      + last_modifier           = (known after apply)
+      + latest_created_revision = (known after apply)
+      + latest_ready_revision   = (known after apply)
+      + launch_stage            = (known after apply)
+      + location                = "southamerica-west1"
+      + name                    = "web"
+      + observed_generation     = (known after apply)
+      + project                 = "agente-iac-pm"
+      + reconciling             = (known after apply)
+      + terminal_condition      = (known after apply)
+      + terraform_labels        = {
+          + "goog-terraform-provisioned" = "true"
+        }
+      + traffic_statuses        = (known after apply)
+      + uid                     = (known after apply)
+      + update_time             = (known after apply)
+      + uri                     = (known after apply)
+      + urls                    = (known after apply)
+
+      + scaling (known after apply)
+
+      + template {
+          + max_instance_request_concurrency = (known after apply)
+          + service_account                  = "sa-web@agente-iac-pm.iam.gserviceaccount.com"
+          + timeout                          = (known after apply)
+
+          + containers {
+              + build_info = (known after apply)
+              + image      = "southamerica-west1-docker.pkg.dev/agente-iac-pm/apps/picanteria-web:v1"
+
+              + env {
+                  + name  = "API_URL"
+                  + value = (known after apply)
+                }
+
+              + ports {
+                  + container_port = 8080
+                  + name           = (known after apply)
+                }
+
+              + resources (known after apply)
+
+              + startup_probe (known after apply)
+            }
+
+          + scaling {
+              + max_instance_count = 2
+              + min_instance_count = 0
+            }
+        }
+
+      + traffic (known after apply)
+    }
+
+  # google_cloud_run_v2_service_iam_member.api_public will be created
+  + resource "google_cloud_run_v2_service_iam_member" "api_public" {
+      + etag     = (known after apply)
+      + id       = (known after apply)
+      + location = "southamerica-west1"
+      + member   = "allUsers"
+      + name     = "api"
+      + project  = (known after apply)
+      + role     = "roles/run.invoker"
+    }
+
+  # google_cloud_run_v2_service_iam_member.web_public will be created
+  + resource "google_cloud_run_v2_service_iam_member" "web_public" {
+      + etag     = (known after apply)
+      + id       = (known after apply)
+      + location = "southamerica-west1"
+      + member   = "allUsers"
+      + name     = "web"
+      + project  = (known after apply)
+      + role     = "roles/run.invoker"
+    }
+
+  # google_project_iam_member.sa_api_cloudsql will be created
+  + resource "google_project_iam_member" "sa_api_cloudsql" {
+      + etag    = (known after apply)
+      + id      = (known after apply)
+      + member  = "serviceAccount:sa-api@agente-iac-pm.iam.gserviceaccount.com"
+      + project = "agente-iac-pm"
+      + role    = "roles/cloudsql.client"
+    }
+
+  # google_project_iam_member.sa_api_secrets will be created
+  + resource "google_project_iam_member" "sa_api_secrets" {
+      + etag    = (known after apply)
+      + id      = (known after apply)
+      + member  = "serviceAccount:sa-api@agente-iac-pm.iam.gserviceaccount.com"
+      + project = "agente-iac-pm"
+      + role    = "roles/secretmanager.secretAccessor"
+    }
+
+  # google_secret_manager_secret.admin_password will be created
+  + resource "google_secret_manager_secret" "admin_password" {
+      + create_time           = (known after apply)
+      + deletion_policy       = "DELETE"
+      + deletion_protection   = false
+      + effective_annotations = (known after apply)
+      + effective_labels      = {
+          + "goog-terraform-provisioned" = "true"
+        }
+      + expire_time           = (known after apply)
+      + id                    = (known after apply)
+      + name                  = (known after apply)
+      + project               = "agente-iac-pm"
+      + secret_id             = "secret-admin-password"
+      + terraform_labels      = {
+          + "goog-terraform-provisioned" = "true"
+        }
+
+      + replication {
+          + auto {
+            }
+        }
+    }
+
+  # google_secret_manager_secret.database_url will be created
+  + resource "google_secret_manager_secret" "database_url" {
+      + create_time           = (known after apply)
+      + deletion_policy       = "DELETE"
+      + deletion_protection   = false
+      + effective_annotations = (known after apply)
+      + effective_labels      = {
+          + "goog-terraform-provisioned" = "true"
+        }
+      + expire_time           = (known after apply)
+      + id                    = (known after apply)
+      + name                  = (known after apply)
+      + project               = "agente-iac-pm"
+      + secret_id             = "secret-database-url"
+      + terraform_labels      = {
+          + "goog-terraform-provisioned" = "true"
+        }
+
+      + replication {
+          + auto {
+            }
+        }
+    }
+
+  # google_secret_manager_secret.db_password will be created
+  + resource "google_secret_manager_secret" "db_password" {
+      + create_time           = (known after apply)
+      + deletion_policy       = "DELETE"
+      + deletion_protection   = false
+      + effective_annotations = (known after apply)
+      + effective_labels      = {
+          + "goog-terraform-provisioned" = "true"
+        }
+      + expire_time           = (known after apply)
+      + id                    = (known after apply)
+      + name                  = (known after apply)
+      + project               = "agente-iac-pm"
+      + secret_id             = "secret-db-password"
+      + terraform_labels      = {
+          + "goog-terraform-provisioned" = "true"
+        }
+
+      + replication {
+          + auto {
+            }
+        }
+    }
+
+  # google_secret_manager_secret_version.admin_password will be created
+  + resource "google_secret_manager_secret_version" "admin_password" {
+      + create_time     = (known after apply)
+      + deletion_policy = (known after apply)
+      + destroy_time    = (known after apply)
+      + enabled         = true
+      + id              = (known after apply)
+      + name            = (known after apply)
+      + project         = (known after apply)
+      + secret          = (known after apply)
+      + secret_data     = (sensitive value)
+      + secret_data_wo  = (write-only attribute)
+      + version         = (known after apply)
+    }
+
+  # google_secret_manager_secret_version.database_url will be created
+  + resource "google_secret_manager_secret_version" "database_url" {
+      + create_time     = (known after apply)
+      + deletion_policy = (known after apply)
+      + destroy_time    = (known after apply)
+      + enabled         = true
+      + id              = (known after apply)
+      + name            = (known after apply)
+      + project         = (known after apply)
+      + secret          = (known after apply)
+      + secret_data     = (sensitive value)
+      + secret_data_wo  = (write-only attribute)
+      + version         = (known after apply)
+    }
+
+  # google_secret_manager_secret_version.db_password will be created
+  + resource "google_secret_manager_secret_version" "db_password" {
+      + create_time     = (known after apply)
+      + deletion_policy = (known after apply)
+      + destroy_time    = (known after apply)
+      + enabled         = true
+      + id              = (known after apply)
+      + name            = (known after apply)
+      + project         = (known after apply)
+      + secret          = (known after apply)
+      + secret_data     = (sensitive value)
+      + secret_data_wo  = (write-only attribute)
+      + version         = (known after apply)
+    }
+
+  # google_service_account.sa_api will be created
+  + resource "google_service_account" "sa_api" {
+      + account_id      = "sa-api"
+      + deletion_policy = "DELETE"
+      + description     = "Cuenta de servicio con minimo privilegio para la API"
+      + disabled        = false
+      + display_name    = "sa-api"
+      + email           = "sa-api@agente-iac-pm.iam.gserviceaccount.com"
+      + id              = (known after apply)
+      + member          = "serviceAccount:sa-api@agente-iac-pm.iam.gserviceaccount.com"
+      + name            = (known after apply)
+      + project         = "agente-iac-pm"
+      + unique_id       = (known after apply)
+    }
+
+  # google_service_account.sa_web will be created
+  + resource "google_service_account" "sa_web" {
+      + account_id      = "sa-web"
+      + deletion_policy = "DELETE"
+      + description     = "Cuenta de servicio con minimo privilegio para el frontend Web"
+      + disabled        = false
+      + display_name    = "sa-web"
+      + email           = "sa-web@agente-iac-pm.iam.gserviceaccount.com"
+      + id              = (known after apply)
+      + member          = "serviceAccount:sa-web@agente-iac-pm.iam.gserviceaccount.com"
+      + name            = (known after apply)
+      + project         = "agente-iac-pm"
+      + unique_id       = (known after apply)
+    }
+
+  # google_sql_database.db will be created
+  + resource "google_sql_database" "db" {
+      + charset         = (known after apply)
+      + collation       = (known after apply)
+      + deletion_policy = "ABANDON"
+      + id              = (known after apply)
+      + instance        = "picanteria-db"
+      + name            = "picanteria"
+      + project         = "agente-iac-pm"
+      + self_link       = (known after apply)
+    }
+
+  # google_sql_database_instance.db will be created
+  + resource "google_sql_database_instance" "db" {
+      + available_maintenance_versions       = (known after apply)
+      + connection_name                      = (known after apply)
+      + database_version                     = "POSTGRES_17"
+      + deletion_policy                      = "DELETE"
+      + deletion_protection                  = false
+      + dns_name                             = (known after apply)
+      + dns_names                            = (known after apply)
+      + encryption_confidential_mode         = (known after apply)
+      + encryption_key_name                  = (known after apply)
+      + enforce_new_sql_network_architecture = (known after apply)
+      + first_ip_address                     = (known after apply)
+      + id                                   = (known after apply)
+      + instance_type                        = (known after apply)
+      + ip_address                           = (known after apply)
+      + maintenance_version                  = (known after apply)
+      + master_instance_name                 = (known after apply)
+      + name                                 = "picanteria-db"
+      + node_count                           = (known after apply)
+      + private_ip_address                   = (known after apply)
+      + project                              = "agente-iac-pm"
+      + psc_service_attachment_link          = (known after apply)
+      + public_ip_address                    = (known after apply)
+      + region                               = "southamerica-west1"
+      + replica_names                        = (known after apply)
+      + root_password_wo                     = (write-only attribute)
+      + self_link                            = (known after apply)
+      + server_ca_cert                       = (sensitive value)
+      + service_account_email_address        = (known after apply)
+
+      + replica_configuration (known after apply)
+
+      + replication_cluster (known after apply)
+
+      + settings {
+          + activation_policy                = "ALWAYS"
+          + availability_type                = "ZONAL"
+          + connector_enforcement            = (known after apply)
+          + data_api_access                  = (known after apply)
+          + data_disk_provisioned_iops       = (known after apply)
+          + data_disk_provisioned_throughput = (known after apply)
+          + disk_autoresize                  = true
+          + disk_autoresize_limit            = 0
+          + disk_size                        = (known after apply)
+          + disk_type                        = (known after apply)
+          + edition                          = "ENTERPRISE"
+          + effective_availability_type      = (known after apply)
+          + pricing_plan                     = "PER_USE"
+          + replication_lag_max_seconds      = (known after apply)
+          + tier                             = "db-f1-micro"
+          + user_labels                      = (known after apply)
+          + version                          = (known after apply)
+
+          + backup_configuration (known after apply)
+
+          + connection_pool_config (known after apply)
+
+          + data_cache_config (known after apply)
+
+          + insights_config (known after apply)
+
+          + ip_configuration {
+              + ipv4_enabled   = true
+              + server_ca_mode = (known after apply)
+              + ssl_mode       = (known after apply)
+            }
+
+          + location_preference (known after apply)
+
+          + read_pool_auto_scale_config (known after apply)
+        }
+    }
+
+  # google_sql_user.user will be created
+  + resource "google_sql_user" "user" {
+      + deletion_policy         = "ABANDON"
+      + host                    = (known after apply)
+      + iam_email               = (known after apply)
+      + id                      = (known after apply)
+      + instance                = "picanteria-db"
+      + name                    = "picanteria"
+      + password                = (sensitive value)
+      + password_wo             = (write-only attribute)
+      + project                 = "agente-iac-pm"
+      + sql_server_user_details = (known after apply)
+    }
+
+Plan: 17 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + service_url = (known after apply)

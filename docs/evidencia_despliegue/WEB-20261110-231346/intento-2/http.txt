@@ -1,0 +1,7 @@
+{
+  "url": "https://web-y2zz3fattq-tl.a.run.app",
+  "codigo": 200,
+  "latencia_ms": 513,
+  "intentos": 1,
+  "ok": true
+}

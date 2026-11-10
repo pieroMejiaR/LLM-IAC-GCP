@@ -1,0 +1,593 @@
+{
+  "run_id": "a55e30733e32",
+  "escenario_id": "WEB-20261110-231346",
+  "nivel": "interactivo",
+  "tratamiento": "T1",
+  "repeticion": 1,
+  "semilla": null,
+  "modelo": "gemini/gemini-3.8-flash",
+  "inicio": "2026-11-10T23:13:46.945631Z",
+  "tiempo_s": 71.1831409460001,
+  "especificacion": {
+    "proyecto": "picanteria",
+    "region": "southamerica-west1",
+    "entornos": [
+      "dev"
+    ],
+    "servicios": [
+      {
+        "tipo": "cloud_sql_postgres",
+        "nombre": "picanteria-db",
+        "publico": false,
+        "parametros": {
+          "version": "POSTGRES_17",
+          "tier": "db-f1-micro",
+          "database_name": "picanteria",
+          "database_user": "picanteria",
+          "ip_publica": true,
+          "redes_autorizadas": false,
+          "deletion_protection": false
+        }
+      },
+      {
+        "tipo": "secret_manager",
+        "nombre": "secret-db-password",
+        "publico": false,
+        "parametros": {
+          "descripcion": "Contrasena del usuario picanteria para Cloud SQL"
+        }
+      },
+      {
+        "tipo": "secret_manager",
+        "nombre": "secret-database-url",
+        "publico": false,
+        "parametros": {
+          "descripcion": "URL de conexion Prisma para la API via socket Cloud SQL"
+        }
+      },
+      {
+        "tipo": "secret_manager",
+        "nombre": "secret-admin-password",
+        "publico": false,
+        "parametros": {
+          "descripcion": "Contrasena del administrador inicial de la aplicacion"
+        }
+      },
+      {
+        "tipo": "iam",
+        "nombre": "sa-api",
+        "publico": false,
+        "parametros": {
+          "descripcion": "Cuenta de servicio con minimo privilegio para la API",
+          "rol_cloudsql": "roles/cloudsql.client",
+          "rol_secrets": "roles/secretmanager.secretAccessor"
+        }
+      },
+      {
+        "tipo": "iam",
+        "nombre": "sa-web",
+        "publico": false,
+        "parametros": {
+          "descripcion": "Cuenta de servicio con minimo privilegio para el frontend Web"
+        }
+      },
+      {
+        "tipo": "cloud_run",
+        "nombre": "api",
+        "publico": true,
+        "parametros": {
+          "imagen": "southamerica-west1-docker.pkg.dev/agente-iac-pm/apps/picanteria-api:v1",
+          "puerto": 3000,
+          "service_account": "sa-api",
+          "cloud_sql_connection": "picanteria-db",
+          "env_cookie_secure": "true",
+          "env_initial_admin_username": "admin",
+          "secret_database_url": "secret-database-url",
+          "secret_initial_admin_password": "secret-admin-password",
+          "min_instances": 0,
+          "max_instances": 2
+        }
+      },
+      {
+        "tipo": "cloud_run",
+        "nombre": "web",
+        "publico": true,
+        "parametros": {
+          "imagen": "southamerica-west1-docker.pkg.dev/agente-iac-pm/apps/picanteria-web:v1",
+          "puerto": 8080,
+          "service_account": "sa-web",
+          "env_api_url_reference": "api",
+          "output_service_url": true,
+          "min_instances": 0,
+          "max_instances": 2
+        }
+      }
+    ],
+    "restricciones": [
+      "Cada componente es un servicio de Cloud Run con su imagen, puerto y cuenta de servicio propia de minimos privilegios.",
+      "No declarar la variable de entorno PORT en Cloud Run ya que el runtime la asigna automaticamente.",
+      "El componente web es publico por HTTPS y su URL debe exportarse con el nombre service_url.",
+      "El componente api debe ser invocable publicamente ya que web le reenvia solicitudes sin credenciales.",
+      "Cloud SQL PostgreSQL debe usar la instancia mas pequena, con IP publica habilitada pero sin redes autorizadas, conectandose mediante el conector Cloud SQL a traves de socket unix en /cloudsql.",
+      "DATABASE_URL debe construirse internamente en la configuracion usando host=/cloudsql/<connection_name>, usuario, contrasena codificada y base de datos, sin solicitarse como variable al usuario.",
+      "Las variables secretas DATABASE_URL e INITIAL_ADMIN_PASSWORD se almacenan en Secret Manager.",
+      "Solo se deben solicitar como variables sensibles sin valor por defecto las contrasenas."
+    ],
+    "supuestos": [
+      "Se selecciona el tier compartido db-f1-micro y deletion_protection false para minimizar costos y facilitar la eliminacion total del entorno dev.",
+      "Se configuran min_instances en 0 en ambos servicios de Cloud Run para reducir costos a cero cuando no haya trafico.",
+      "Se asume que la cuenta de servicio sa-api requiere roles/cloudsql.client para conectar a la base de datos y roles/secretmanager.secretAccessor para leer los secretos.",
+      "El valor de COOKIE_SECURE se establece en 'true' al desplegarse en HTTPS en Cloud Run.",
+      "El valor de INITIAL_ADMIN_USERNAME toma por defecto 'admin' segun la ficha tecnica."
+    ]
+  },
+  "plan_archivos": {
+    "tipos_recurso": [
+      "google_sql_database_instance",
+      "google_sql_database",
+      "google_sql_user",
+      "google_secret_manager_secret",
+      "google_secret_manager_secret_version",
+      "google_service_account",
+      "google_project_iam_member",
+      "google_cloud_run_v2_service",
+      "google_cloud_run_v2_service_iam_member"
+    ],
+    "archivos": [
+      "versions.tf",
+      "providers.tf",
+      "main.tf",
+      "variables.tf",
+      "outputs.tf"
+    ],
+    "por_servicio": {
+      "cloud_sql_postgres:picanteria-db": [
+        "google_sql_database_instance",
+        "google_sql_database",
+        "google_sql_user"
+      ],
+      "secret_manager:secret-db-password": [
+        "google_secret_manager_secret",
+        "google_secret_manager_secret_version"
+      ],
+      "secret_manager:secret-database-url": [
+        "google_secret_manager_secret",
+        "google_secret_manager_secret_version"
+      ],
+      "secret_manager:secret-admin-password": [
+        "google_secret_manager_secret",
+        "google_secret_manager_secret_version"
+      ],
+      "iam:sa-api": [
+        "google_service_account",
+        "google_project_iam_member"
+      ],
+      "iam:sa-web": [
+        "google_service_account",
+        "google_project_iam_member"
+      ],
+      "cloud_run:api": [
+        "google_cloud_run_v2_service",
+        "google_cloud_run_v2_service_iam_member"
+      ],
+      "cloud_run:web": [
+        "google_cloud_run_v2_service",
+        "google_cloud_run_v2_service_iam_member"
+      ]
+    },
+    "servicios_implicitos": []
+  },
+  "archivos": {
+    "versions.tf": "terraform {\n  required_version = \">= 1.5\"\n  required_providers {\n    google = {\n      source  = \"hashicorp/google\"\n      version = \"~> 8.8\"\n    }\n  }\n}\n",
+    "providers.tf": "provider \"google\" {\n  project = var.project_id\n  region  = var.region\n}\n",
+    "variables.tf": "variable \"project_id\" {\n  description = \"ID del proyecto en Google Cloud\"\n  type        = string\n}\n\nvariable \"region\" {\n  description = \"Región de Google Cloud para los recursos\"\n  type        = string\n  default     = \"southamerica-west1\"\n}\n\nvariable \"db_password\" {\n  description = \"Contraseña del usuario picanteria en Cloud SQL\"\n  type        = string\n  sensitive   = true\n}\n\nvariable \"initial_admin_password\" {\n  description = \"Contraseña inicial del administrador de la aplicación\"\n  type        = string\n  sensitive   = true\n}\n\nvariable \"initial_admin_username\" {\n  description = \"Nombre de usuario inicial del administrador de la aplicación\"\n  type        = string\n  default     = \"admin\"\n}\n\nvariable \"api_container_image\" {\n  description = \"Imagen de contenedor para la API\"\n  type        = string\n  default     = \"southamerica-west1-docker.pkg.dev/agente-iac-pm/apps/picanteria-api:v1\"\n}\n\nvariable \"web_container_image\" {\n  description = \"Imagen de contenedor para el frontend Web\"\n  type        = string\n  default     = \"southamerica-west1-docker.pkg.dev/agente-iac-pm/apps/picanteria-web:v1\"\n}\n",
+    "main.tf": "# ---------------------------------------------------------\n# Cloud SQL: PostgreSQL 17\n# ---------------------------------------------------------\nresource \"google_sql_database_instance\" \"db\" {\n  name                = \"picanteria-db\"\n  database_version    = \"POSTGRES_17\"\n  region              = var.region\n  deletion_protection = false\n\n  settings {\n    tier    = \"db-f1-micro\"\n    edition = \"ENTERPRISE\"\n    ip_configuration {\n      ipv4_enabled = true\n    }\n  }\n}\n\nresource \"google_sql_database\" \"db\" {\n  name            = \"picanteria\"\n  instance        = google_sql_database_instance.db.name\n  deletion_policy = \"ABANDON\"\n}\n\nresource \"google_sql_user\" \"user\" {\n  name            = \"picanteria\"\n  instance        = google_sql_database_instance.db.name\n  password        = var.db_password\n  deletion_policy = \"ABANDON\"\n}\n\n# ---------------------------------------------------------\n# Secret Manager: Secretos y Versiones\n# ---------------------------------------------------------\nresource \"google_secret_manager_secret\" \"db_password\" {\n  secret_id = \"secret-db-password\"\n\n  replication {\n    auto {}\n  }\n}\n\nresource \"google_secret_manager_secret_version\" \"db_password\" {\n  secret      = google_secret_manager_secret.db_password.id\n  secret_data = var.db_password\n}\n\nresource \"google_secret_manager_secret\" \"database_url\" {\n  secret_id = \"secret-database-url\"\n\n  replication {\n    auto {}\n  }\n}\n\nresource \"google_secret_manager_secret_version\" \"database_url\" {\n  secret      = google_secret_manager_secret.database_url.id\n  secret_data = \"postgresql://${google_sql_user.user.name}:${urlencode(var.db_password)}@localhost/${google_sql_database.db.name}?host=/cloudsql/${google_sql_database_instance.db.connection_name}\"\n}\n\nresource \"google_secret_manager_secret\" \"admin_password\" {\n  secret_id = \"secret-admin-password\"\n\n  replication {\n    auto {}\n  }\n}\n\nresource \"google_secret_manager_secret_version\" \"admin_password\" {\n  secret      = google_secret_manager_secret.admin_password.id\n  secret_data = var.initial_admin_password\n}\n\n# ---------------------------------------------------------\n# Cuentas de Servicio e IAM\n# ---------------------------------------------------------\nresource \"google_service_account\" \"sa_api\" {\n  account_id   = \"sa-api\"\n  display_name = \"sa-api\"\n  description  = \"Cuenta de servicio con minimo privilegio para la API\"\n}\n\nresource \"google_project_iam_member\" \"sa_api_cloudsql\" {\n  project = var.project_id\n  role    = \"roles/cloudsql.client\"\n  member  = \"serviceAccount:${google_service_account.sa_api.email}\"\n}\n\nresource \"google_project_iam_member\" \"sa_api_secrets\" {\n  project = var.project_id\n  role    = \"roles/secretmanager.secretAccessor\"\n  member  = \"serviceAccount:${google_service_account.sa_api.email}\"\n}\n\nresource \"google_service_account\" \"sa_web\" {\n  account_id   = \"sa-web\"\n  display_name = \"sa-web\"\n  description  = \"Cuenta de servicio con minimo privilegio para el frontend Web\"\n}\n\n# ---------------------------------------------------------\n# Cloud Run: API\n# ---------------------------------------------------------\nresource \"google_cloud_run_v2_service\" \"api\" {\n  name                = \"api\"\n  location            = var.region\n  deletion_protection = false\n\n  template {\n    service_account = google_service_account.sa_api.email\n\n    scaling {\n      min_instance_count = 0\n      max_instance_count = 2\n    }\n\n    volumes {\n      name = \"cloudsql\"\n      cloud_sql_instance {\n        instances = [google_sql_database_instance.db.connection_name]\n      }\n    }\n\n    containers {\n      image = var.api_container_image\n\n      ports {\n        container_port = 3000\n      }\n\n      volume_mounts {\n        name       = \"cloudsql\"\n        mount_path = \"/cloudsql\"\n      }\n\n      env {\n        name  = \"COOKIE_SECURE\"\n        value = \"true\"\n      }\n\n      env {\n        name  = \"INITIAL_ADMIN_USERNAME\"\n        value = var.initial_admin_username\n      }\n\n      env {\n        name = \"DATABASE_URL\"\n        value_source {\n          secret_key_ref {\n            secret  = google_secret_manager_secret.database_url.secret_id\n            version = \"latest\"\n          }\n        }\n      }\n\n      env {\n        name = \"INITIAL_ADMIN_PASSWORD\"\n        value_source {\n          secret_key_ref {\n            secret  = google_secret_manager_secret.admin_password.secret_id\n            version = \"latest\"\n          }\n        }\n      }\n    }\n  }\n\n  depends_on = [\n    google_secret_manager_secret_version.database_url,\n    google_secret_manager_secret_version.admin_password,\n    google_project_iam_member.sa_api_cloudsql,\n    google_project_iam_member.sa_api_secrets\n  ]\n}\n\nresource \"google_cloud_run_v2_service_iam_member\" \"api_public\" {\n  name     = google_cloud_run_v2_service.api.name\n  location = google_cloud_run_v2_service.api.location\n  role     = \"roles/run.invoker\"\n  member   = \"allUsers\"\n}\n\n# ---------------------------------------------------------\n# Cloud Run: Web\n# ---------------------------------------------------------\nresource \"google_cloud_run_v2_service\" \"web\" {\n  name                = \"web\"\n  location            = var.region\n  deletion_protection = false\n\n  template {\n    service_account = google_service_account.sa_web.email\n\n    scaling {\n      min_instance_count = 0\n      max_instance_count = 2\n    }\n\n    containers {\n      image = var.web_container_image\n\n      ports {\n        container_port = 8080\n      }\n\n      env {\n        name  = \"API_URL\"\n        value = google_cloud_run_v2_service.api.uri\n      }\n    }\n  }\n}\n\nresource \"google_cloud_run_v2_service_iam_member\" \"web_public\" {\n  name     = google_cloud_run_v2_service.web.name\n  location = google_cloud_run_v2_service.web.location\n  role     = \"roles/run.invoker\"\n  member   = \"allUsers\"\n}\n",
+    "outputs.tf": "output \"service_url\" {\n  description = \"URL pública del servicio frontend Web\"\n  value       = google_cloud_run_v2_service.web.uri\n}\n"
+  },
+  "validacion": {
+    "archivos": {
+      "versions.tf": "terraform {\n  required_version = \">= 1.5\"\n  required_providers {\n    google = {\n      source  = \"hashicorp/google\"\n      version = \"~> 8.8\"\n    }\n  }\n}\n",
+      "providers.tf": "provider \"google\" {\n  project = var.project_id\n  region  = var.region\n}\n",
+      "variables.tf": "variable \"project_id\" {\n  description = \"ID del proyecto en Google Cloud\"\n  type        = string\n}\n\nvariable \"region\" {\n  description = \"Región de Google Cloud para los recursos\"\n  type        = string\n  default     = \"southamerica-west1\"\n}\n\nvariable \"db_password\" {\n  description = \"Contraseña del usuario picanteria en Cloud SQL\"\n  type        = string\n  sensitive   = true\n}\n\nvariable \"initial_admin_password\" {\n  description = \"Contraseña inicial del administrador de la aplicación\"\n  type        = string\n  sensitive   = true\n}\n\nvariable \"initial_admin_username\" {\n  description = \"Nombre de usuario inicial del administrador de la aplicación\"\n  type        = string\n  default     = \"admin\"\n}\n\nvariable \"api_container_image\" {\n  description = \"Imagen de contenedor para la API\"\n  type        = string\n  default     = \"southamerica-west1-docker.pkg.dev/agente-iac-pm/apps/picanteria-api:v1\"\n}\n\nvariable \"web_container_image\" {\n  description = \"Imagen de contenedor para el frontend Web\"\n  type        = string\n  default     = \"southamerica-west1-docker.pkg.dev/agente-iac-pm/apps/picanteria-web:v1\"\n}\n",
+      "main.tf": "# ---------------------------------------------------------\n# Cloud SQL: PostgreSQL 17\n# ---------------------------------------------------------\nresource \"google_sql_database_instance\" \"db\" {\n  name                = \"picanteria-db\"\n  database_version    = \"POSTGRES_17\"\n  region              = var.region\n  deletion_protection = false\n\n  settings {\n    tier    = \"db-f1-micro\"\n    edition = \"ENTERPRISE\"\n    ip_configuration {\n      ipv4_enabled = true\n    }\n  }\n}\n\nresource \"google_sql_database\" \"db\" {\n  name            = \"picanteria\"\n  instance        = google_sql_database_instance.db.name\n  deletion_policy = \"ABANDON\"\n}\n\nresource \"google_sql_user\" \"user\" {\n  name            = \"picanteria\"\n  instance        = google_sql_database_instance.db.name\n  password        = var.db_password\n  deletion_policy = \"ABANDON\"\n}\n\n# ---------------------------------------------------------\n# Secret Manager: Secretos y Versiones\n# ---------------------------------------------------------\nresource \"google_secret_manager_secret\" \"db_password\" {\n  secret_id = \"secret-db-password\"\n\n  replication {\n    auto {}\n  }\n}\n\nresource \"google_secret_manager_secret_version\" \"db_password\" {\n  secret      = google_secret_manager_secret.db_password.id\n  secret_data = var.db_password\n}\n\nresource \"google_secret_manager_secret\" \"database_url\" {\n  secret_id = \"secret-database-url\"\n\n  replication {\n    auto {}\n  }\n}\n\nresource \"google_secret_manager_secret_version\" \"database_url\" {\n  secret      = google_secret_manager_secret.database_url.id\n  secret_data = \"postgresql://${google_sql_user.user.name}:${urlencode(var.db_password)}@localhost/${google_sql_database.db.name}?host=/cloudsql/${google_sql_database_instance.db.connection_name}\"\n}\n\nresource \"google_secret_manager_secret\" \"admin_password\" {\n  secret_id = \"secret-admin-password\"\n\n  replication {\n    auto {}\n  }\n}\n\nresource \"google_secret_manager_secret_version\" \"admin_password\" {\n  secret      = google_secret_manager_secret.admin_password.id\n  secret_data = var.initial_admin_password\n}\n\n# ---------------------------------------------------------\n# Cuentas de Servicio e IAM\n# ---------------------------------------------------------\nresource \"google_service_account\" \"sa_api\" {\n  account_id   = \"sa-api\"\n  display_name = \"sa-api\"\n  description  = \"Cuenta de servicio con minimo privilegio para la API\"\n}\n\nresource \"google_project_iam_member\" \"sa_api_cloudsql\" {\n  project = var.project_id\n  role    = \"roles/cloudsql.client\"\n  member  = \"serviceAccount:${google_service_account.sa_api.email}\"\n}\n\nresource \"google_project_iam_member\" \"sa_api_secrets\" {\n  project = var.project_id\n  role    = \"roles/secretmanager.secretAccessor\"\n  member  = \"serviceAccount:${google_service_account.sa_api.email}\"\n}\n\nresource \"google_service_account\" \"sa_web\" {\n  account_id   = \"sa-web\"\n  display_name = \"sa-web\"\n  description  = \"Cuenta de servicio con minimo privilegio para el frontend Web\"\n}\n\n# ---------------------------------------------------------\n# Cloud Run: API\n# ---------------------------------------------------------\nresource \"google_cloud_run_v2_service\" \"api\" {\n  name                = \"api\"\n  location            = var.region\n  deletion_protection = false\n\n  template {\n    service_account = google_service_account.sa_api.email\n\n    scaling {\n      min_instance_count = 0\n      max_instance_count = 2\n    }\n\n    volumes {\n      name = \"cloudsql\"\n      cloud_sql_instance {\n        instances = [google_sql_database_instance.db.connection_name]\n      }\n    }\n\n    containers {\n      image = var.api_container_image\n\n      ports {\n        container_port = 3000\n      }\n\n      volume_mounts {\n        name       = \"cloudsql\"\n        mount_path = \"/cloudsql\"\n      }\n\n      env {\n        name  = \"COOKIE_SECURE\"\n        value = \"true\"\n      }\n\n      env {\n        name  = \"INITIAL_ADMIN_USERNAME\"\n        value = var.initial_admin_username\n      }\n\n      env {\n        name = \"DATABASE_URL\"\n        value_source {\n          secret_key_ref {\n            secret  = google_secret_manager_secret.database_url.secret_id\n            version = \"latest\"\n          }\n        }\n      }\n\n      env {\n        name = \"INITIAL_ADMIN_PASSWORD\"\n        value_source {\n          secret_key_ref {\n            secret  = google_secret_manager_secret.admin_password.secret_id\n            version = \"latest\"\n          }\n        }\n      }\n    }\n  }\n\n  depends_on = [\n    google_secret_manager_secret_version.database_url,\n    google_secret_manager_secret_version.admin_password,\n    google_project_iam_member.sa_api_cloudsql,\n    google_project_iam_member.sa_api_secrets\n  ]\n}\n\nresource \"google_cloud_run_v2_service_iam_member\" \"api_public\" {\n  name     = google_cloud_run_v2_service.api.name\n  location = google_cloud_run_v2_service.api.location\n  role     = \"roles/run.invoker\"\n  member   = \"allUsers\"\n}\n\n# ---------------------------------------------------------\n# Cloud Run: Web\n# ---------------------------------------------------------\nresource \"google_cloud_run_v2_service\" \"web\" {\n  name                = \"web\"\n  location            = var.region\n  deletion_protection = false\n\n  template {\n    service_account = google_service_account.sa_web.email\n\n    scaling {\n      min_instance_count = 0\n      max_instance_count = 2\n    }\n\n    containers {\n      image = var.web_container_image\n\n      ports {\n        container_port = 8080\n      }\n\n      env {\n        name  = \"API_URL\"\n        value = google_cloud_run_v2_service.api.uri\n      }\n    }\n  }\n}\n\nresource \"google_cloud_run_v2_service_iam_member\" \"web_public\" {\n  name     = google_cloud_run_v2_service.web.name\n  location = google_cloud_run_v2_service.web.location\n  role     = \"roles/run.invoker\"\n  member   = \"allUsers\"\n}\n",
+      "outputs.tf": "output \"service_url\" {\n  description = \"URL pública del servicio frontend Web\"\n  value       = google_cloud_run_v2_service.web.uri\n}\n"
+    },
+    "controles": [
+      {
+        "control": "guard",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [],
+        "duracion_s": 0.0,
+        "salida": ""
+      },
+      {
+        "control": "fmt",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [],
+        "duracion_s": 0.365,
+        "salida": ""
+      },
+      {
+        "control": "init",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [],
+        "duracion_s": 0.923,
+        "salida": "Initializing the backend...\n\nInitializing provider plugins...\n- Finding hashicorp/google versions matching \"~> 8.8\"...\n- Installing hashicorp/google v8.8.1...\n- Installed hashicorp/google v8.8.1 (unauthenticated)\n\nTerraform has created a lock file .terraform.lock.hcl to record the provider\nselections it made above. Include this file in your version control repository\nso that Terraform can guarantee to make the same selections by default when\nyou run \"terraform init\" in the future.\n\n\nWarning: Incomplete lock file information for providers\n\nDue to your customized provider installation methods, Terraform was forced to\ncalculate lock file checksums locally for the following providers:\n  - hashicorp/google\n\nThe current .terraform.lock.hcl file only includes checksums for linux_amd64,\nso Terraform running on another platform will fail to install these\nproviders.\n\nTo calculate additional checksums for another platform, run:\n  terraform providers lock -platform=linux_amd64\n(where linux_amd64 is the platform to generate)\nTerraform has been successfully initialized!\n"
+      },
+      {
+        "control": "validate",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [],
+        "duracion_s": 0.661,
+        "salida": "{\n  \"format_version\": \"1.0\",\n  \"valid\": true,\n  \"error_count\": 0,\n  \"warning_count\": 0,\n  \"diagnostics\": []\n}\n"
+      },
+      {
+        "control": "tflint",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [],
+        "duracion_s": 0.167,
+        "salida": "{\"issues\":[],\"errors\":[]}"
+      },
+      {
+        "control": "checkov",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure all Cloud SQL database instance have backup configuration enabled (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV_GCP_14",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          },
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure PostgreSQL database 'log_connections' flag is set to 'on' (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV_GCP_52",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          },
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure the GCP PostgreSQL database log levels are set to ERROR or lower (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV_GCP_109",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          },
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure all Cloud SQL database instance requires all incoming connections to use SSL (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV_GCP_6",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          },
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure PostgreSQL database 'log_checkpoints' flag is set to 'on' (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV_GCP_51",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          },
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure PostgreSQL database 'log_lock_waits' flag is set to 'on' (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV_GCP_54",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          },
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure GCP PostgreSQL logs SQL statements (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV_GCP_111",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          },
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure pgAudit is enabled for your GCP PostgreSQL database (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV_GCP_110",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          },
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure SQL database is using latest Major version (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV_GCP_79",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          },
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure hostnames are logged for GCP PostgreSQL databases (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV_GCP_108",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          },
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure Cloud SQL database does not have public IP (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV_GCP_60",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          },
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure PostgreSQL database 'log_disconnections' flag is set to 'on' (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV_GCP_53",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          },
+          {
+            "control": "checkov",
+            "severidad": "warning",
+            "mensaje": "Ensure PostgreSQL database flag 'log_duration' is set to 'on' (google_sql_database_instance.db)",
+            "archivo": "main.tf",
+            "linea": 4,
+            "regla": "CKV2_GCP_13",
+            "tipo_recurso": "google_sql_database_instance",
+            "origen": "codigo"
+          }
+        ],
+        "duracion_s": 3.113,
+        "salida": "                 \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"variable\",\n                            \"name\": \"region\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/variables.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.api\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.web\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        }\n                    ]\n                }\n            },\n            {\n                \"check_id\": \"CKV_GCP_110\",\n                \"bc_check_id\": null,\n                \"check_name\": \"Ensure pgAudit is enabled for your GCP PostgreSQL database\",\n                \"check_result\": {\n                    \"result\": \"FAILED\",\n                    \"evaluated_keys\": [\n                        \"database_version/[0]/POSTGRES\",\n                        \"settings\"\n                    ]\n                },\n                \"code_block\": null,\n                \"file_path\": \"/main.tf\",\n                \"file_abs_path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                \"repo_file_path\": \"/main.tf\",\n                \"file_line_range\": [\n                    4,\n                    17\n                ],\n                \"resource\": \"google_sql_database_instance.db\",\n                \"evaluations\": null,\n                \"check_class\": \"checkov.terraform.checks.resource.gcp.GoogleCloudPostgreSqlEnablePgaudit\",\n                \"fixed_definition\": null,\n                \"entity_tags\": null,\n                \"caller_file_path\": null,\n                \"caller_file_line_range\": null,\n                \"resource_address\": null,\n                \"severity\": null,\n                \"bc_category\": null,\n                \"benchmarks\": {},\n                \"description\": null,\n                \"short_description\": null,\n                \"vulnerability_details\": null,\n                \"connected_node\": null,\n                \"guideline\": null,\n                \"details\": [],\n                \"check_len\": null,\n                \"definition_context_file_path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                \"breadcrumbs\": {\n                    \"region\": [\n                        {\n                            \"type\": \"tfvar\",\n                            \"name\": \"region\",\n                            \"path\": \"env:TF_VAR_region\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"variable\",\n                            \"name\": \"region\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/variables.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.api\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.web\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        }\n                    ]\n                }\n            },\n            {\n                \"check_id\": \"CKV_GCP_79\",\n                \"bc_check_id\": null,\n                \"check_name\": \"Ensure SQL database is using latest Major version\",\n                \"check_result\": {\n                    \"result\": \"FAILED\",\n                    \"evaluated_keys\": [\n                        \"database_version\"\n                    ]\n                },\n                \"code_block\": null,\n                \"file_path\": \"/main.tf\",\n                \"file_abs_path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                \"repo_file_path\": \"/main.tf\",\n                \"file_line_range\": [\n                    4,\n                    17\n                ],\n                \"resource\": \"google_sql_database_instance.db\",\n                \"evaluations\": null,\n                \"check_class\": \"checkov.terraform.checks.resource.gcp.CloudSqlMajorVersion\",\n                \"fixed_definition\": null,\n                \"entity_tags\": null,\n                \"caller_file_path\": null,\n                \"caller_file_line_range\": null,\n                \"resource_address\": null,\n                \"severity\": null,\n                \"bc_category\": null,\n                \"benchmarks\": {},\n                \"description\": null,\n                \"short_description\": null,\n                \"vulnerability_details\": null,\n                \"connected_node\": null,\n                \"guideline\": null,\n                \"details\": [],\n                \"check_len\": null,\n                \"definition_context_file_path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                \"breadcrumbs\": {\n                    \"region\": [\n                        {\n                            \"type\": \"tfvar\",\n                            \"name\": \"region\",\n                            \"path\": \"env:TF_VAR_region\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"variable\",\n                            \"name\": \"region\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/variables.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.api\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.web\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        }\n                    ]\n                }\n            },\n            {\n                \"check_id\": \"CKV_GCP_108\",\n                \"bc_check_id\": null,\n                \"check_name\": \"Ensure hostnames are logged for GCP PostgreSQL databases\",\n                \"check_result\": {\n                    \"result\": \"FAILED\",\n                    \"evaluated_keys\": [\n                        \"database_version/[0]/POSTGRES\",\n                        \"settings\"\n                    ]\n                },\n                \"code_block\": null,\n                \"file_path\": \"/main.tf\",\n                \"file_abs_path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                \"repo_file_path\": \"/main.tf\",\n                \"file_line_range\": [\n                    4,\n                    17\n                ],\n                \"resource\": \"google_sql_database_instance.db\",\n                \"evaluations\": null,\n                \"check_class\": \"checkov.terraform.checks.resource.gcp.GoogleCloudPostgreSqlLogHostname\",\n                \"fixed_definition\": null,\n                \"entity_tags\": null,\n                \"caller_file_path\": null,\n                \"caller_file_line_range\": null,\n                \"resource_address\": null,\n                \"severity\": null,\n                \"bc_category\": null,\n                \"benchmarks\": {},\n                \"description\": null,\n                \"short_description\": null,\n                \"vulnerability_details\": null,\n                \"connected_node\": null,\n                \"guideline\": null,\n                \"details\": [],\n                \"check_len\": null,\n                \"definition_context_file_path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                \"breadcrumbs\": {\n                    \"region\": [\n                        {\n                            \"type\": \"tfvar\",\n                            \"name\": \"region\",\n                            \"path\": \"env:TF_VAR_region\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"variable\",\n                            \"name\": \"region\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/variables.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.api\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.web\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        }\n                    ]\n                }\n            },\n            {\n                \"check_id\": \"CKV_GCP_60\",\n                \"bc_check_id\": null,\n                \"check_name\": \"Ensure Cloud SQL database does not have public IP\",\n                \"check_result\": {\n                    \"result\": \"FAILED\",\n                    \"evaluated_keys\": [\n                        \"database_version/[0]/SQLSERVER\",\n                        \"settings/[0]/ip_configuration/[0]/ipv4_enabled\"\n                    ]\n                },\n                \"code_block\": null,\n                \"file_path\": \"/main.tf\",\n                \"file_abs_path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                \"repo_file_path\": \"/main.tf\",\n                \"file_line_range\": [\n                    4,\n                    17\n                ],\n                \"resource\": \"google_sql_database_instance.db\",\n                \"evaluations\": null,\n                \"check_class\": \"checkov.terraform.checks.resource.gcp.GoogleCloudSqlServerNoPublicIP\",\n                \"fixed_definition\": null,\n                \"entity_tags\": null,\n                \"caller_file_path\": null,\n                \"caller_file_line_range\": null,\n                \"resource_address\": null,\n                \"severity\": null,\n                \"bc_category\": null,\n                \"benchmarks\": {},\n                \"description\": null,\n                \"short_description\": null,\n                \"vulnerability_details\": null,\n                \"connected_node\": null,\n                \"guideline\": null,\n                \"details\": [],\n                \"check_len\": null,\n                \"definition_context_file_path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                \"breadcrumbs\": {\n                    \"region\": [\n                        {\n                            \"type\": \"tfvar\",\n                            \"name\": \"region\",\n                            \"path\": \"env:TF_VAR_region\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"variable\",\n                            \"name\": \"region\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/variables.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.api\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.web\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        }\n                    ]\n                }\n            },\n            {\n                \"check_id\": \"CKV_GCP_53\",\n                \"bc_check_id\": null,\n                \"check_name\": \"Ensure PostgreSQL database 'log_disconnections' flag is set to 'on'\",\n                \"check_result\": {\n                    \"result\": \"FAILED\",\n                    \"evaluated_keys\": [\n                        \"database_version/[0]/POSTGRES\",\n                        \"settings\"\n                    ]\n                },\n                \"code_block\": null,\n                \"file_path\": \"/main.tf\",\n                \"file_abs_path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                \"repo_file_path\": \"/main.tf\",\n                \"file_line_range\": [\n                    4,\n                    17\n                ],\n                \"resource\": \"google_sql_database_instance.db\",\n                \"evaluations\": null,\n                \"check_class\": \"checkov.terraform.checks.resource.gcp.GoogleCloudPostgreSqlLogDisconnection\",\n                \"fixed_definition\": null,\n                \"entity_tags\": null,\n                \"caller_file_path\": null,\n                \"caller_file_line_range\": null,\n                \"resource_address\": null,\n                \"severity\": null,\n                \"bc_category\": null,\n                \"benchmarks\": {},\n                \"description\": null,\n                \"short_description\": null,\n                \"vulnerability_details\": null,\n                \"connected_node\": null,\n                \"guideline\": null,\n                \"details\": [],\n                \"check_len\": null,\n                \"definition_context_file_path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                \"breadcrumbs\": {\n                    \"region\": [\n                        {\n                            \"type\": \"tfvar\",\n                            \"name\": \"region\",\n                            \"path\": \"env:TF_VAR_region\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"variable\",\n                            \"name\": \"region\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/variables.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.api\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.web\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        }\n                    ]\n                }\n            },\n            {\n                \"check_id\": \"CKV2_GCP_13\",\n                \"bc_check_id\": null,\n                \"check_name\": \"Ensure PostgreSQL database flag 'log_duration' is set to 'on'\",\n                \"check_result\": {\n                    \"result\": \"FAILED\",\n                    \"entity\": {\n                        \"google_sql_database_instance\": {\n                            \"db\": {\n                                \"__end_line__\": 17,\n                                \"__start_line__\": 4,\n                                \"database_version\": [\n                                    \"POSTGRES_17\"\n                                ],\n                                \"deletion_protection\": [\n                                    false\n                                ],\n                                \"name\": [\n                                    \"picanteria-db\"\n                                ],\n                                \"region\": [\n                                    \"southamerica-west1\"\n                                ],\n                                \"settings\": [\n                                    {\n                                        \"edition\": [\n                                            \"ENTERPRISE\"\n                                        ],\n                                        \"ip_configuration\": [\n                                            {\n                                                \"ipv4_enabled\": [\n                                                    true\n                                                ]\n                                            }\n                                        ],\n                                        \"tier\": [\n                                            \"db-f1-micro\"\n                                        ]\n                                    }\n                                ],\n                                \"__address__\": \"google_sql_database_instance.db\"\n                            }\n                        }\n                    },\n                    \"evaluated_keys\": [\n                        \"database_version\",\n                        \"settings/database_flags[?(@/name == log_duration & @/value == on)]\"\n                    ]\n                },\n                \"code_block\": null,\n                \"file_path\": \"/main.tf\",\n                \"file_abs_path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                \"repo_file_path\": \"/main.tf\",\n                \"file_line_range\": [\n                    4,\n                    17\n                ],\n                \"resource\": \"google_sql_database_instance.db\",\n                \"evaluations\": null,\n                \"check_class\": \"checkov.common.graph.checks_infra.base_check\",\n                \"fixed_definition\": null,\n                \"entity_tags\": null,\n                \"caller_file_path\": null,\n                \"caller_file_line_range\": null,\n                \"resource_address\": null,\n                \"severity\": null,\n                \"bc_category\": null,\n                \"benchmarks\": {},\n                \"description\": null,\n                \"short_description\": null,\n                \"vulnerability_details\": null,\n                \"connected_node\": null,\n                \"guideline\": null,\n                \"details\": [],\n                \"check_len\": null,\n                \"definition_context_file_path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                \"breadcrumbs\": {\n                    \"region\": [\n                        {\n                            \"type\": \"tfvar\",\n                            \"name\": \"region\",\n                            \"path\": \"env:TF_VAR_region\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"variable\",\n                            \"name\": \"region\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/variables.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.api\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        },\n                        {\n                            \"type\": \"resource\",\n                            \"name\": \"google_cloud_run_v2_service.web\",\n                            \"path\": \"/tmp/iac-eval-y2xmpl8z/main.tf\",\n                            \"module_connection\": false\n                        }\n                    ]\n                }\n            }\n        ]\n    },\n    \"summary\": {\n        \"passed\": 20,\n        \"failed\": 13,\n        \"skipped\": 0,\n        \"parsing_errors\": 0,\n        \"resource_count\": 17,\n        \"checkov_version\": \"3.3.30\"\n    }\n}\n"
+      },
+      {
+        "control": "plan",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [
+          {
+            "control": "plan",
+            "severidad": "warning",
+            "mensaje": "plan con valores de relleno para: db_password, initial_admin_password",
+            "archivo": null,
+            "linea": null,
+            "regla": null,
+            "tipo_recurso": null,
+            "origen": "entorno"
+          }
+        ],
+        "duracion_s": 1.556,
+        "salida": "{\"@level\":\"info\",\"@message\":\"Terraform 1.16.7\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:10.638084Z\",\"terraform\":\"1.16.7\",\"type\":\"version\",\"ui\":\"1.3\"}\n{\"@level\":\"info\",\"@message\":\"google_service_account.sa_web: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158251Z\",\"change\":{\"resource\":{\"addr\":\"google_service_account.sa_web\",\"module\":\"\",\"resource\":\"google_service_account.sa_web\",\"implied_provider\":\"google\",\"resource_type\":\"google_service_account\",\"resource_name\":\"sa_web\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_service_account.sa_api: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158408Z\",\"change\":{\"resource\":{\"addr\":\"google_service_account.sa_api\",\"module\":\"\",\"resource\":\"google_service_account.sa_api\",\"implied_provider\":\"google\",\"resource_type\":\"google_service_account\",\"resource_name\":\"sa_api\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_secret_manager_secret.database_url: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158420Z\",\"change\":{\"resource\":{\"addr\":\"google_secret_manager_secret.database_url\",\"module\":\"\",\"resource\":\"google_secret_manager_secret.database_url\",\"implied_provider\":\"google\",\"resource_type\":\"google_secret_manager_secret\",\"resource_name\":\"database_url\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_secret_manager_secret.db_password: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158430Z\",\"change\":{\"resource\":{\"addr\":\"google_secret_manager_secret.db_password\",\"module\":\"\",\"resource\":\"google_secret_manager_secret.db_password\",\"implied_provider\":\"google\",\"resource_type\":\"google_secret_manager_secret\",\"resource_name\":\"db_password\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_secret_manager_secret.admin_password: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158435Z\",\"change\":{\"resource\":{\"addr\":\"google_secret_manager_secret.admin_password\",\"module\":\"\",\"resource\":\"google_secret_manager_secret.admin_password\",\"implied_provider\":\"google\",\"resource_type\":\"google_secret_manager_secret\",\"resource_name\":\"admin_password\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_project_iam_member.sa_api_cloudsql: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158442Z\",\"change\":{\"resource\":{\"addr\":\"google_project_iam_member.sa_api_cloudsql\",\"module\":\"\",\"resource\":\"google_project_iam_member.sa_api_cloudsql\",\"implied_provider\":\"google\",\"resource_type\":\"google_project_iam_member\",\"resource_name\":\"sa_api_cloudsql\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_project_iam_member.sa_api_secrets: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158449Z\",\"change\":{\"resource\":{\"addr\":\"google_project_iam_member.sa_api_secrets\",\"module\":\"\",\"resource\":\"google_project_iam_member.sa_api_secrets\",\"implied_provider\":\"google\",\"resource_type\":\"google_project_iam_member\",\"resource_name\":\"sa_api_secrets\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_secret_manager_secret_version.db_password: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158454Z\",\"change\":{\"resource\":{\"addr\":\"google_secret_manager_secret_version.db_password\",\"module\":\"\",\"resource\":\"google_secret_manager_secret_version.db_password\",\"implied_provider\":\"google\",\"resource_type\":\"google_secret_manager_secret_version\",\"resource_name\":\"db_password\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_secret_manager_secret_version.admin_password: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158461Z\",\"change\":{\"resource\":{\"addr\":\"google_secret_manager_secret_version.admin_password\",\"module\":\"\",\"resource\":\"google_secret_manager_secret_version.admin_password\",\"implied_provider\":\"google\",\"resource_type\":\"google_secret_manager_secret_version\",\"resource_name\":\"admin_password\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_sql_database_instance.db: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158471Z\",\"change\":{\"resource\":{\"addr\":\"google_sql_database_instance.db\",\"module\":\"\",\"resource\":\"google_sql_database_instance.db\",\"implied_provider\":\"google\",\"resource_type\":\"google_sql_database_instance\",\"resource_name\":\"db\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_sql_database.db: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158475Z\",\"change\":{\"resource\":{\"addr\":\"google_sql_database.db\",\"module\":\"\",\"resource\":\"google_sql_database.db\",\"implied_provider\":\"google\",\"resource_type\":\"google_sql_database\",\"resource_name\":\"db\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_sql_user.user: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158482Z\",\"change\":{\"resource\":{\"addr\":\"google_sql_user.user\",\"module\":\"\",\"resource\":\"google_sql_user.user\",\"implied_provider\":\"google\",\"resource_type\":\"google_sql_user\",\"resource_name\":\"user\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_secret_manager_secret_version.database_url: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158489Z\",\"change\":{\"resource\":{\"addr\":\"google_secret_manager_secret_version.database_url\",\"module\":\"\",\"resource\":\"google_secret_manager_secret_version.database_url\",\"implied_provider\":\"google\",\"resource_type\":\"google_secret_manager_secret_version\",\"resource_name\":\"database_url\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_cloud_run_v2_service.api: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158493Z\",\"change\":{\"resource\":{\"addr\":\"google_cloud_run_v2_service.api\",\"module\":\"\",\"resource\":\"google_cloud_run_v2_service.api\",\"implied_provider\":\"google\",\"resource_type\":\"google_cloud_run_v2_service\",\"resource_name\":\"api\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_cloud_run_v2_service_iam_member.api_public: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158500Z\",\"change\":{\"resource\":{\"addr\":\"google_cloud_run_v2_service_iam_member.api_public\",\"module\":\"\",\"resource\":\"google_cloud_run_v2_service_iam_member.api_public\",\"implied_provider\":\"google\",\"resource_type\":\"google_cloud_run_v2_service_iam_member\",\"resource_name\":\"api_public\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_cloud_run_v2_service.web: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158507Z\",\"change\":{\"resource\":{\"addr\":\"google_cloud_run_v2_service.web\",\"module\":\"\",\"resource\":\"google_cloud_run_v2_service.web\",\"implied_provider\":\"google\",\"resource_type\":\"google_cloud_run_v2_service\",\"resource_name\":\"web\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"google_cloud_run_v2_service_iam_member.web_public: Plan to create\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158513Z\",\"change\":{\"resource\":{\"addr\":\"google_cloud_run_v2_service_iam_member.web_public\",\"module\":\"\",\"resource\":\"google_cloud_run_v2_service_iam_member.web_public\",\"implied_provider\":\"google\",\"resource_type\":\"google_cloud_run_v2_service_iam_member\",\"resource_name\":\"web_public\",\"resource_key\":null},\"action\":\"create\"},\"type\":\"planned_change\"}\n{\"@level\":\"info\",\"@message\":\"Plan: 17 to add, 0 to change, 0 to destroy.\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158540Z\",\"changes\":{\"add\":17,\"change\":0,\"import\":0,\"remove\":0,\"action_invocation\":0,\"action_fail\":0,\"operation\":\"plan\"},\"type\":\"change_summary\"}\n{\"@level\":\"info\",\"@message\":\"Outputs: 1\",\"@module\":\"terraform.ui\",\"@timestamp\":\"2026-11-10T23:15:12.158617Z\",\"outputs\":{\"service_url\":{\"sensitive\":false,\"action\":\"create\"}},\"type\":\"outputs\"}\n"
+      }
+    ],
+    "cambios_plan": [
+      {
+        "direccion": "google_cloud_run_v2_service.api",
+        "tipo": "google_cloud_run_v2_service",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_cloud_run_v2_service.web",
+        "tipo": "google_cloud_run_v2_service",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_cloud_run_v2_service_iam_member.api_public",
+        "tipo": "google_cloud_run_v2_service_iam_member",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_cloud_run_v2_service_iam_member.web_public",
+        "tipo": "google_cloud_run_v2_service_iam_member",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_project_iam_member.sa_api_cloudsql",
+        "tipo": "google_project_iam_member",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_project_iam_member.sa_api_secrets",
+        "tipo": "google_project_iam_member",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_secret_manager_secret.admin_password",
+        "tipo": "google_secret_manager_secret",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_secret_manager_secret.database_url",
+        "tipo": "google_secret_manager_secret",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_secret_manager_secret.db_password",
+        "tipo": "google_secret_manager_secret",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_secret_manager_secret_version.admin_password",
+        "tipo": "google_secret_manager_secret_version",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_secret_manager_secret_version.database_url",
+        "tipo": "google_secret_manager_secret_version",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_secret_manager_secret_version.db_password",
+        "tipo": "google_secret_manager_secret_version",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_service_account.sa_api",
+        "tipo": "google_service_account",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_service_account.sa_web",
+        "tipo": "google_service_account",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_sql_database.db",
+        "tipo": "google_sql_database",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_sql_database_instance.db",
+        "tipo": "google_sql_database_instance",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_sql_user.user",
+        "tipo": "google_sql_user",
+        "acciones": [
+          "create"
+        ]
+      }
+    ],
+    "versiones": {
+      "terraform": "1.16.7",
+      "google": "8.8.1",
+      "tflint": "0.65.0",
+      "tflint-ruleset-google": "0.40.0",
+      "checkov": "3.3.30"
+    }
+  },
+  "intentos_detalle": [
+    {
+      "numero": 0,
+      "accion": "generar",
+      "ok": true,
+      "control_fallido": null,
+      "errores": [],
+      "duracion_validacion_s": 11.707
+    }
+  ],
+  "llamadas": [
+    {
+      "etapa": "analizar",
+      "tokens_entrada": 1278,
+      "tokens_salida": 3417,
+      "tokens_razonamiento": 2157,
+      "costo_usd": 0.01377225,
+      "duracion_s": 27.412
+    },
+    {
+      "etapa": "generar",
+      "tokens_entrada": 5252,
+      "tokens_salida": 4725,
+      "tokens_razonamiento": 2519,
+      "costo_usd": 0.02165775,
+      "duracion_s": 32.053
+    }
+  ],
+  "errores_analisis": [],
+  "validate_ok": true,
+  "plan_ok": true,
+  "intentos": 0,
+  "checkov_fallidas": 13,
+  "tipos_recurso_codigo": [
+    "google_sql_database_instance",
+    "google_sql_database",
+    "google_sql_user",
+    "google_secret_manager_secret",
+    "google_secret_manager_secret_version",
+    "google_service_account",
+    "google_project_iam_member",
+    "google_cloud_run_v2_service",
+    "google_cloud_run_v2_service_iam_member"
+  ],
+  "tipos_recurso_plan": [
+    "google_cloud_run_v2_service",
+    "google_cloud_run_v2_service_iam_member",
+    "google_project_iam_member",
+    "google_secret_manager_secret",
+    "google_secret_manager_secret_version",
+    "google_service_account",
+    "google_sql_database",
+    "google_sql_database_instance",
+    "google_sql_user"
+  ],
+  "cobertura_codigo": null,
+  "cobertura_plan": null,
+  "tokens_entrada": 6530,
+  "tokens_salida": 8142,
+  "costo_usd": 0.03543,
+  "error_final": null,
+  "tipo_error": "ninguno",
+  "versiones": {
+    "terraform": "1.16.7",
+    "google": "8.8.1",
+    "tflint": "0.65.0",
+    "tflint-ruleset-google": "0.40.0",
+    "checkov": "3.3.30"
+  }
+}
