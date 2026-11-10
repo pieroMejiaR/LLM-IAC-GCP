@@ -269,6 +269,33 @@ def _entorno_base(proyecto: str | None, region: str, cuenta: str | None) -> dict
     return env
 
 
+# En modo evaluación nadie entrega contraseñas ni claves: sin estos valores, plan falla por
+# "No value for required variable", que mide el entorno y no el código. Cumple validaciones
+# comunes de longitud y complejidad. Solo se usa en evaluación; al desplegar los valores son reales.
+_RELLENO = "Relleno-Plan-2026-x9"
+
+
+def valores_de_relleno(archivos: dict[str, str]) -> dict[str, str]:
+    """TF_VAR_* para las variables sin default (project_id y region ya los pone el sandbox)."""
+    env: dict[str, str] = {}
+    for nombre, tipo in guard.variables_sin_valor(archivos).items():
+        if nombre in ("project_id", "region"):
+            continue
+        t = tipo.replace(" ", "")
+        if t.startswith(("list", "set", "tuple")):
+            valor = "[]"
+        elif t.startswith(("map", "object")):
+            valor = "{}"
+        elif t == "number":
+            valor = "1"
+        elif t == "bool":
+            valor = "false"
+        else:
+            valor = _RELLENO
+        env[f"TF_VAR_{nombre}"] = valor
+    return env
+
+
 def _escribir(directorio: Path, archivos: dict[str, str]) -> None:
     directorio.mkdir(parents=True, exist_ok=True)
     for nombre, contenido in archivos.items():
@@ -364,11 +391,17 @@ class ValidadorLocal:
             return res
 
         env_plan = _entorno_base(self.proyecto, self.region, self.cuenta)
+        relleno = valores_de_relleno(res.archivos)
+        env_plan.update(relleno)
         rc, out, err, dur = self.ej.terraform_cmd(
             ["plan", "-input=false", "-lock=false", "-no-color", "-json", "-out=plan.tfplan"], d, env_plan)
         diags = parse_plan_json_lines(out)
         if rc and not diags:
             diags = parse_texto_errores(err, "plan")
+        if relleno:
+            nombres = ", ".join(sorted(k.removeprefix("TF_VAR_") for k in relleno))
+            diags.append(Diagnostico(control="plan", severidad="warning", origen="entorno",
+                                     mensaje=f"plan con valores de relleno para: {nombres}"))
         res.controles.append(_control("plan", rc == 0, diags, dur, out + err))
         if rc == 0:
             rc2, out2, _, _ = self.ej.terraform_cmd(["show", "-json", "plan.tfplan"], d, env_plan)

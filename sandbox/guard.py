@@ -376,6 +376,8 @@ class _Revision:
                 self._proveedor(b)
             elif b.tipo in ("resource", "data"):
                 self._recurso(b)
+            elif b.tipo == "variable":
+                self._variable(b)
             elif b.tipo == "check":
                 for hijo in b.bloques:
                     if hijo.tipo == "data":
@@ -478,6 +480,16 @@ class _Revision:
                 self.error(f'El {b.tipo} usa un proveedor no permitido: "{self._valor(a)}".', a.pos)
         self._anidados(b)
 
+    def _variable(self, b: _Bloque) -> None:
+        """Una variable sensible no puede traer su valor en el código (contraseñas, claves de API)."""
+        attrs = {a.nombre: a for a in b.atributos}
+        sensible = "sensitive" in attrs and self._valor(attrs["sensitive"]) == "true"
+        if sensible and "default" in attrs and self._valor(attrs["default"]) != "null":
+            nombre = b.etiquetas[0] if b.etiquetas and b.etiquetas[0] else "?"
+            self.error(f'La variable sensible "{nombre}" tiene valor por defecto: no escribas contraseñas ni '
+                       "secretos en el código. Quita default; el valor lo entrega quien ejecuta "
+                       "(en la evaluación, el sandbox le pasa un valor de relleno).", attrs["default"].pos)
+
     def _anidados(self, b: _Bloque) -> None:
         for hijo in b.bloques:
             tipo = hijo.tipo
@@ -493,6 +505,30 @@ def _normalizar_fuente(fuente: str) -> str:
     if len(partes) == 3 and partes[0] == "registry.terraform.io":
         partes = partes[1:]
     return "/".join(partes)
+
+
+def variables_sin_valor(archivos: dict[str, str]) -> dict[str, str]:
+    """Variables declaradas sin default, con el texto de su type ("" si no lo declara).
+
+    Se usa después de revisar(): un archivo que no se puede analizar ya fue rechazado.
+    """
+    salida: dict[str, str] = {}
+    for nombre, texto in archivos.items():
+        if not _RE_NOMBRE_ARCHIVO.match(nombre):
+            continue
+        try:
+            lex = _Lexico(texto)
+            raiz = _Bloques(lex).raiz()
+        except ErrorAnalisis:
+            continue
+        sin_com = "".join(lex.sin_com)
+        for b in raiz.bloques:
+            if b.tipo != "variable" or not b.etiquetas or not b.etiquetas[0]:
+                continue
+            attrs = {a.nombre: sin_com[a.ini:a.fin].strip() for a in b.atributos}
+            if "default" not in attrs:
+                salida[b.etiquetas[0]] = attrs.get("type", "")
+    return salida
 
 
 def revisar(archivos: dict[str, str]) -> list[Diagnostico]:

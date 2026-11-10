@@ -6,6 +6,7 @@ import pytest
 
 from sandbox import guard
 from sandbox.local_runner import (
+    _RELLENO,
     PERMITIDOS_EVALUACION,
     ComandoNoPermitido,
     _entorno_base,
@@ -18,6 +19,7 @@ from sandbox.local_runner import (
     parse_tflint_json,
     parse_validate_json,
     parse_version_json,
+    valores_de_relleno,
 )
 
 S1, S2, S3, S4 = (pytest.mark.seguridad(f"S{i}") for i in range(1, 5))
@@ -144,6 +146,39 @@ def test_guard_rechaza_nombres_de_archivo(nombre):
 def test_guard_informa_archivo_y_linea():
     diags = guard.revisar({"versions.tf": BASE, "main.tf": '\n\ndata "http" "x" {\n  url = "https://e.com"\n}\n'})
     assert {(d.archivo, d.linea) for d in diags} == {("main.tf", 3)}
+
+
+def test_guard_rechaza_variable_sensible_con_valor():
+    """En el piloto (lote-v1), T1 "reparó" el plan escribiendo contraseñas como default."""
+    codigo = 'variable "db_password" {\n  type      = string\n  sensitive = true\n  default   = "ChangeMe123!"\n}\n'
+    diags = guard.revisar({"variables.tf": codigo})
+    assert len(diags) == 1 and "db_password" in diags[0].mensaje and diags[0].linea == 4
+
+
+@pytest.mark.parametrize("codigo", [
+    'variable "db_password" {\n  type      = string\n  sensitive = true\n}\n',
+    'variable "db_password" {\n  sensitive = true\n  default   = null\n}\n',
+    'variable "region" {\n  type    = string\n  default = "southamerica-west1"\n}\n',
+    'variable "x" {\n  sensitive = false\n  default   = "a"\n}\n',
+])
+def test_guard_acepta_variables_sin_secretos(codigo):
+    assert guard.revisar({"variables.tf": codigo}) == []
+
+
+def test_valores_de_relleno_para_variables_sin_default():
+    archivos = {"variables.tf": (
+        'variable "project_id" { type = string }\n'
+        'variable "region" {\n  default = "southamerica-west1"\n}\n'
+        'variable "db_password" {\n  type      = string\n  sensitive = true\n}\n'
+        'variable "n" { type = number }\n'
+        'variable "lista" { type = list(string) }\n'
+        'variable "mapa" { type = map(string) }\n'
+        'variable "activo" { type = bool }\n'
+        'variable "sin_tipo" {}\n'), "main.tf": 'resource "google_storage_bucket" "b" {}\n'}
+    assert valores_de_relleno(archivos) == {
+        "TF_VAR_db_password": _RELLENO, "TF_VAR_n": "1", "TF_VAR_lista": "[]", "TF_VAR_mapa": "{}",
+        "TF_VAR_activo": "false", "TF_VAR_sin_tipo": _RELLENO}
+    assert len(_RELLENO) >= 12   # cumple validaciones de longitud como la de proyecto_completo
 
 
 @S1

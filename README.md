@@ -81,7 +81,8 @@ Las corridas de la interfaz se guardan en `resultados/web/`, fuera de los escena
 
 | Capa | Qué hace |
 | --- | --- |
-| Revisión del código | `sandbox/guard.py` analiza el HCL antes de `init` y rechaza otros proveedores, `provisioner`, `data "external"` y `"http"`, módulos, `backend`, `import`, funciones que leen archivos (`file`, `templatefile`…), fuentes de datos que exponen tokens y argumentos del provider que cambian la credencial o los endpoints. Si no puede analizar un archivo, lo rechaza (S2 a S4). |
+| Revisión del código | `sandbox/guard.py` analiza el HCL antes de `init` y rechaza otros proveedores, `provisioner`, `data "external"` y `"http"`, módulos, `backend`, `import`, funciones que leen archivos (`file`, `templatefile`…), fuentes de datos que exponen tokens y argumentos del provider que cambian la credencial o los endpoints. También rechaza variables `sensitive = true` con `default`, para que no queden contraseñas ni claves escritas en el código. Si no puede analizar un archivo, lo rechaza (S2 a S4). |
+| Valores de relleno | En modo evaluación nadie entrega secretos, así que `plan` recibe un valor de relleno (`TF_VAR_*`) para cada variable sin `default`; así mide el código y no la falta de valores. En modo despliegue los valores son reales. Se agregó tras el piloto (`lote-v1`), donde T1 pasaba `plan` escribiendo contraseñas por defecto. |
 | Proveedores | Terraform solo instala google y google-beta desde un espejo dentro de la imagen (`sandbox/terraform.rc`); no llega al registro. |
 | Red | El agente está en una red interna de Docker, sin ruta a internet. Su única salida es un proxy Squid que solo abre túneles HTTPS a `*.googleapis.com`, y en despliegue también a `*.run.app` (`sandbox/proxy/permitidos_*.txt`) (S6). |
 | Proceso | Usuario sin privilegios (uid 10001), sistema de archivos de solo lectura, `/tmp` en memoria, sin capabilities, `no-new-privileges` y límites de memoria, CPU y procesos. |
