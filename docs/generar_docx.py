@@ -1,6 +1,6 @@
 """Script para generar el informe final en formato Word (.docx) a partir de docs/informe.md.
 
-Utiliza python-docx aplicando estilos profesionales acordes al estándar de la UNSA / GESITI.
+Utiliza python-docx aplicando estilos profesionales acordes al estándar de la UNSA.
 """
 import re
 from pathlib import Path
@@ -11,7 +11,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 
-DOCX_OUTPUT = Path("docs/INFORME_FINAL_GESITI_IAC_GCP.docx")
+DOCX_OUTPUT = Path("docs/informe.docx")
 MD_INPUT = Path("docs/informe.md")
 
 # Colores del tema institucional
@@ -136,7 +136,7 @@ def build_docx():
         header = section.header
         p_hdr = header.paragraphs[0]
         p_hdr.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        r_hdr = p_hdr.add_run("UNSA | GESITI 2026-B — Agente IaC para Google Cloud Platform")
+        r_hdr = p_hdr.add_run("UNSA 2026-B — Agente IaC para Google Cloud Platform")
         r_hdr.font.name = "Calibri"
         r_hdr.font.size = Pt(8.5)
         r_hdr.font.color.rgb = COLOR_MUTED
@@ -210,7 +210,7 @@ def build_docx():
     tbl_meta = doc.add_table(rows=6, cols=2)
     tbl_meta.alignment = WD_TABLE_ALIGNMENT.CENTER
     meta_data = [
-        ("ASIGNATURA:", "Gestión de Sistemas y Tecnologías de Información (GESITI)"),
+        ("ASIGNATURA:", "Gestión de Sistemas y Tecnologías de Información"),
         ("SEMESTRE ACADÉMICO:", "2026-B (Décimo Semestre)"),
         ("DOCENTE ASESOR:", "Mg. Roberto Carlos Espinoza Ccama"),
         ("INTEGRANTES:", "• Callocondo Garay, Santiago Stuart (scallocondo@unsa.edu.pe)\n"

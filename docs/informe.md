@@ -4,7 +4,7 @@
 
 ---
 
-**ASIGNATURA:** Gestión de Sistemas y Tecnologías de Información (GESITI)  
+**ASIGNATURA:** Gestión de Sistemas y Tecnologías de Información  
 **SEMESTRE ACADÉMICO:** 2026-B (X Semestre)  
 **DOCENTE:** Mg. Roberto Carlos Espinoza Ccama  
 
@@ -16,7 +16,7 @@
 
 ---
 
-### AUTORES (SUBGRUPO GESITI):
+### AUTORES:
 - **Callocondo Garay, Santiago Stuart** (`scallocondo@unsa.edu.pe`) — *Rol: Sandbox, Aislamiento y Seguridad (S1–S8)*
 - **Llerena Morón, Gabriel Alonso** (`gllerenamo@unsa.edu.pe`) — *Rol: Diseño de Escenarios, Lote Experimental y Evaluación Estadística*
 - **Mejía Ramos, Piero Alexander** (`pmejiar@unsa.edu.pe` / `pieromejiaramos@gmail.com`) — *Rol: Arquitectura del Agente, Grounding y Despliegue en GCP*
