@@ -1,0 +1,45 @@
+diagnostico · Diagnóstico del entorno del sandbox
+Fecha: 2026-11-10T02:51:58+00:00   Contenedor: b34ef4cc5221   Usuario: uid=10001
+Proxy de salida: http://proxy:3128
+
+[OK] GEMINI_API_KEY
+       esperado: definida
+       obtenido: definida (39 caracteres)
+[OK] AGENT_MODELO
+       esperado: definida
+       obtenido: gemini/gemini-3.8-flash
+[OK] GCP_PROYECTO
+       esperado: definida
+       obtenido: agente-iac-pm
+[OK] GCP_REGION
+       esperado: definida
+       obtenido: southamerica-west1
+[OK] GCP_CUENTA_EVALUACION
+       esperado: definida
+       obtenido: agente-viewer@agente-iac-pm.iam.gserviceaccount.com
+[OK] GCP_CUENTA_DESPLIEGUE
+       esperado: definida
+       obtenido: agente-deploy@agente-iac-pm.iam.gserviceaccount.com
+[OK] Credencial de gcloud montada en /run/secrets/adc
+       esperado: archivo de application_default_credentials
+       obtenido: archivo legible, tipo authorized_user
+
+[OK] Salida a las APIs de Google por el proxy
+       esperado: responde el destino
+       obtenido: HTTP 200 del destino
+[OK] Gemini: modelo gemini-3.8-flash
+       esperado: HTTP 200
+       obtenido: HTTP 200: el modelo existe y la clave es válida
+
+[OK] terraform plan suplantando la cuenta de evaluación (Viewer) (agente-viewer@agente-iac-pm.iam.gserviceaccount.com)
+       esperado: lee el proyecto (credencial, suplantación y API funcionan)
+       obtenido: correcto
+[OK] terraform plan suplantando la cuenta de despliegue (agente-deploy@agente-iac-pm.iam.gserviceaccount.com)
+       esperado: lee el proyecto (credencial, suplantación y API funcionan)
+       obtenido: correcto
+
+[OK] Validación de referencia (caso real, sin plan)
+       esperado: pasan todos los controles
+       obtenido: correcto: guard 0.0s, fmt 0.0s, init 0.2s, validate 0.9s, tflint 0.2s, checkov 5.1s; total 6.5s
+
+Resultado: 10/10 comprobaciones dieron lo esperado

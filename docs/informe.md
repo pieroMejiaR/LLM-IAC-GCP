@@ -73,7 +73,7 @@ El experimento evaluó 12 escenarios de complejidad progresiva (4 básicos, 5 in
 
 Asimismo, se validó la transferencia a entornos productivos mediante el despliegue real de una aplicación multicontenedor (sistema de pedidos gastronómicos *Picantería Digital*: API NestJS, frontend SPA en Nginx, base de datos Cloud SQL PostgreSQL 17 y Secret Manager en la región `southamerica-west1`). La infraestructura se aprovisionó de manera 100 % autónoma tras aprobación humana explícita del plan en 380.5 s, respondiendo exitosamente a pruebas de disponibilidad HTTP en la primera verificación pública.
 
-Por último, el estudio comparativo frente a la medición cronometrada manual realizada por un ingeniero DevOps sobre 3 escenarios arrojó una **reducción de tiempo del 97.5 %** (de 3.25 horas humanas a 4.75 minutos acumulados del agente) y una **reducción de costo económico del 99.98 %** (de $179.12 USD en costo de horas de consultoría DevOps a tan solo $0.027 USD en consumo de tokens de LLM), demostrando la viabilidad técnica, operativa y económica de la solución propuesta.
+Por último, la comparación con la redacción manual cronometrada de 3 escenarios (uno por nivel), realizada por un integrante del equipo, arrojó una **reducción de tiempo del 98.7 %** (de 3.25 horas a 2.6 minutos de agente, sin contar la revisión humana) y una **reducción del costo directo de autoría del 99.95 %** (de 179.12 USD en horas de ingeniería, a la tarifa de referencia de 55 USD por hora, a 0.087 USD en tokens de LLM).
 
 ---
 
@@ -475,10 +475,12 @@ Para la monetización del tiempo humano se establecieron dos fuentes de referenc
 #### Tabla 5.10: Comparativa de Tiempos y Costos: Elaboración Manual frente al Agente T1
 | Escenario Evaluado | Nivel | Recursos | Tiempo Manual Cronometrado | Tiempo Agente T1 | Reducción de Tiempo (%) | Costo Humano ($55/h) | Costo Inferencia T1 (LLM) | Ahorro Económico (%) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **BAS-01** | Básico | 2 | 24 min 30 s (1,470 s) | 38.2 s | **97.4 %** | $22.46 USD | $0.0034 USD | **99.98 %** |
-| **INT-01** | Intermedio | 11 | 52 min 12 s (3,132 s) | 84.6 s | **97.3 %** | $47.85 USD | $0.0078 USD | **99.98 %** |
-| **AVA-01** | Avanzado | 15 | 1 h 58 min 42 s (7,122 s) | 162.4 s | **97.7 %** | $108.81 USD | $0.0156 USD | **99.99 %** |
-| **TOTALES** | **3 Niveles** | **28** | **3 h 15 min 24 s (11,724 s)** | **285.2 s (~4.75 min)** | **97.57 %** | **$179.12 USD** | **$0.0268 USD** | **99.985 %** |
+| **BAS-01** | Básico | 2 | 24 min 30 s (1,470 s) | 27.5 s | **98.1 %** | $22.46 USD | $0.0111 USD | **99.95 %** |
+| **INT-01** | Intermedio | 11 | 52 min 12 s (3,132 s) | 59.9 s | **98.1 %** | $47.85 USD | $0.0321 USD | **99.93 %** |
+| **AVA-01** | Avanzado | 15 | 1 h 58 min 42 s (7,122 s) | 69.2 s | **99.0 %** | $108.81 USD | $0.0442 USD | **99.96 %** |
+| **TOTALES** | **3 Niveles** | **28** | **3 h 15 min 24 s (11,724 s)** | **156.6 s (~2.6 min)** | **98.66 %** | **$179.12 USD** | **$0.0874 USD** | **99.95 %** |
+
+Los valores del agente son la mediana de las tres repeticiones de T1 de cada escenario en el experimento (`docs/experimento/lote-v2/runs.csv`); en las nueve corridas, el código superó `validate` y `plan`, con una sola reparación (en AVA-01). Los tiempos manuales provienen de `eval/manual/medicion_manual.csv`.
 
 ```mermaid
 xychart-beta
@@ -486,16 +488,16 @@ xychart-beta
     x-axis ["BAS-01 (Básico)", "INT-01 (Intermedio)", "AVA-01 (Avanzado)"]
     y-axis "Tiempo (segundos)" 0 --> 7500
     bar [1470, 3132, 7122]
-    line [38, 85, 162]
+    line [27, 60, 69]
 ```
 
-La Tabla 5.10 evidencia que el agente IaC autónomo proporciona una **aceleración de más de 41 veces** en el tiempo de entrega y reduce el costo de autoría en **más del 99.98 %**. El Anexo D presenta la transcripción íntegra del código HCL escrito a mano, el detalle de errores sintácticos cometidos por el operador humano y la bitácora de iteraciones.
+La Tabla 5.10 muestra que, en estos tres escenarios, el agente produjo código validado en unos 2.6 minutos en total frente a 3 h 15 min de redacción manual, una **aceleración de unas 75 veces**, y redujo el costo directo de autoría en **más del 99.9 %**. El tiempo del agente no incluye la revisión humana de la especificación ni del código, que en un uso real debe sumarse, por lo que la reducción reportada es una cota superior. El Anexo D presenta la transcripción íntegra del código HCL escrito a mano, el detalle de errores sintácticos cometidos por el operador humano y la bitácora de iteraciones.
 
 ---
 
 ### 5.8 EVALUACIÓN DE SEGURIDAD DEL SANDBOX: PRUEBAS S1 A S8
 
-La contención del entorno de ejecución se evaluó con 8 pruebas de seguridad (S1 a S8). Siete están automatizadas en pytest y se ejecutan dentro del contenedor del sandbox con Terraform, TFLint y Checkov reales (`docker compose run --rm pruebas`): las 110 pruebas de la suite pasaron sobre el código congelado. S6 cuenta además con un script de evidencia de 10 comprobaciones, y S5 requiere las credenciales del proyecto. La Tabla 5.11 resume el resultado y el mecanismo de cada control; la evidencia está en `docs/evidencia_seguridad/`.
+La contención del entorno de ejecución se evaluó con 8 pruebas de seguridad (S1 a S8). Siete están automatizadas en pytest y se ejecutan dentro del contenedor del sandbox con Terraform, TFLint y Checkov reales (`docker compose run --rm pruebas`): las 130 pruebas de la suite pasaron sobre el código entregado (commit `b0aa708`, que suma al código del experimento el ingreso de contraseñas del modo despliegue), y las 110 del piloto pasaron sobre `4a78d23`. S6 cuenta además con un script de evidencia de 10 comprobaciones, y S5 se ejecuta aparte contra el proyecto de GCP, porque requiere las credenciales. La Tabla 5.11 resume el resultado y el mecanismo de cada control; la evidencia está en `docs/evidencia_seguridad/`.
 
 #### Tabla 5.11: Resultados de la Batería de Pruebas de Seguridad del Sandbox (S1 a S8)
 | ID Control | Propósito y Amenaza Mitigada | Mecanismo de Defensa Implementado | Resultado de Prueba | Evidencia Asociada |
@@ -504,12 +506,12 @@ La contención del entorno de ejecución se evaluó con 8 pruebas de seguridad (
 | **S2** | Rechazo de código de proveedores ajenos a GCP. | `guard.py` analiza la estructura del HCL y rechaza bloques `provider`, fuentes de `required_providers` y tipos de recurso que no sean de `google` o `google-beta`. Como segunda capa, Terraform solo instala proveedores desde el espejo local de la imagen (`sandbox/terraform.rc`). | **PASÓ (14 pruebas)** | 12 en `test_sandbox.py` y 2 en `test_contenedor.py::test_init_solo_instala_proveedores_del_espejo` |
 | **S3** | Rechazo de ejecución local y de lectura de archivos o credenciales. | `guard.py` rechaza `provisioner`, `connection`, `data "external"`, funciones que leen archivos (`file`, `templatefile`, `filebase64`…), `credentials` e `impersonate_service_account` en el provider, `data "google_client_config"` e `import`. La clave del LLM no se pasa a Terraform, TFLint ni Checkov. | **PASÓ (16 pruebas)** | `test_sandbox.py` |
 | **S4** | Rechazo de peticiones de red desde Terraform. | `guard.py` rechaza `data "http"`, `backend`, `cloud`, `terraform_remote_state`, módulos y endpoints personalizados del provider. | **PASÓ (11 pruebas)** | `test_sandbox.py` |
-| **S5** | La cuenta de evaluación (Viewer) no puede crear recursos. | `plan` suplanta una cuenta con `roles/viewer`. La prueba intenta crear un bucket con `terraform apply` usando esa cuenta y espera un error 403. | **PENDIENTE** | `S5-viewer.txt`, por generar con `python -m sandbox.pruebas_seguridad s5` (requiere las credenciales del proyecto) |
+| **S5** | La cuenta de evaluación (Viewer) no puede crear recursos. | `plan` suplanta una cuenta con `roles/viewer`. La prueba intenta crear un bucket con `terraform apply` usando esa cuenta y espera un error 403. | **PASÓ (4/4 comprobaciones)** | `S5-20261110-025243.txt`: con `agente-viewer@agente-iac-pm`, `plan` termina bien, `apply` falla con *Error 403: does not have storage.buckets.create access* y el estado queda vacío |
 | **S6** | El contenedor no se conecta a internet. | Red interna de Docker sin ruta a internet; la única salida es un proxy Squid que solo abre túneles HTTPS a `*.googleapis.com` (y a `*.run.app` en despliegue). | **PASÓ (6 pruebas y 10/10 comprobaciones)** | `S6-red.txt`, `S6-log-proxy.txt`, `test_contenedor.py` |
 | **S7** | Sin aprobación humana no hay `apply`. | Para aplicar el plan, el operador debe escribir el ID exacto del proyecto; cualquier otra respuesta cancela el despliegue. | **PASÓ (1 prueba)** | `test_deploy.py::test_sin_aprobacion_no_hay_apply` |
 | **S8** | Rechazo de planes con recursos fuera del catálogo o con destrucción. | `deploy.py::verificar_plan` revisa los cambios de `terraform show -json` y rechaza tipos fuera del catálogo y acciones de borrado o reemplazo, sin llegar a preguntar al operador. | **PASÓ (2 pruebas)** | `test_deploy.py::test_verificar_plan_rechaza_fuera_de_catalogo_y_destruccion` y `::test_plan_fuera_de_catalogo_no_pregunta` |
 
-S5 queda pendiente porque las credenciales del proyecto las administra un solo integrante. Al ejecutarse, el resultado y el archivo `S5-viewer.txt` reemplazan esta fila.
+S5 se ejecutó el 10 de noviembre de 2026 en el proyecto `agente-iac-pm`, el mismo en el que corrió el experimento, después de un diagnóstico del entorno que superó sus 10 comprobaciones (`diagnostico-20261110-025158.txt`). Con S5, las ocho pruebas de seguridad dieron el resultado esperado.
 
 ---
 
@@ -526,7 +528,7 @@ El aporte medible de T1 está en la completitud del código y en el cumplimiento
 ### 6.2 CONCLUSIONES ESPECÍFICAS (C1 A C4)
 
 #### Conclusión C1: Seguridad del Sandbox y Confinamiento de Ejecución (Santiago Callocondo)
-La arquitectura de contención por capas (revisión estructural del HCL con `guard.py` antes de `init`, espejo local de proveedores, red interna de Docker sin salida directa a internet, proxy Squid con lista blanca de dominios de Google Cloud, contenedores de solo lectura sin privilegios y suplantación de la cuenta Viewer) superó las pruebas automatizadas S1 a S4 y S6 a S8: el código generado no pudo usar otros proveedores, ejecutar comandos locales, leer archivos o credenciales del sandbox, salir a internet ni desplegar sin aprobación humana. Las capas se complementan: si la revisión estática dejara pasar un caso, el espejo de proveedores y la red siguen bloqueándolo. S5 (permisos de la cuenta Viewer) queda pendiente de evidencia. Persisten riesgos residuales: la credencial del operador se monta en el contenedor, las APIs de Google permitidas podrían usarse como canal de salida de datos y la revisión estática puede tener falsos negativos.
+La arquitectura de contención por capas (revisión estructural del HCL con `guard.py` antes de `init`, espejo local de proveedores, red interna de Docker sin salida directa a internet, proxy Squid con lista blanca de dominios de Google Cloud, contenedores de solo lectura sin privilegios y suplantación de la cuenta Viewer) superó las ocho pruebas de seguridad: el código generado no pudo usar otros proveedores, ejecutar comandos locales, leer archivos o credenciales del sandbox, salir a internet ni desplegar sin aprobación humana, y la cuenta Viewer usada en `plan` recibió un error 403 al intentar crear un recurso (S5). Las capas se complementan: si la revisión estática dejara pasar un caso, el espejo de proveedores, la red y la credencial de solo lectura siguen bloqueándolo. Persisten riesgos residuales: la credencial del operador se monta en el contenedor, las APIs de Google permitidas podrían usarse como canal de salida de datos y la revisión estática puede tener falsos negativos.
 
 #### Conclusión C2: Efectividad del Grounding y el Bucle T1 (Gabriel Llerena)
 Con el modelo evaluado, el grounding y el bucle de validación de T1 no aumentaron de forma significativa la tasa de éxito de validación ni la de plan: T0 alcanzó 97.2 % y T1 100 % en ambos controles (McNemar exacto, $p = 1.0$; Wilcoxon por escenario, $p = 1.0$). Por lo tanto, no se rechaza la hipótesis nula. T1 sí incluyó todos los tipos de recurso esperados (cobertura de 100 % frente a 88.5 %, con un IC 95 % de la diferencia de [4.2 %, 19.4 %]), aunque esa diferencia deja de ser significativa tras la corrección de Holm ($p = 0.156$). Los hallazgos de Checkov no difieren entre tratamientos ($p = 0.83$).
@@ -535,7 +537,7 @@ Con el modelo evaluado, el grounding y el bucle de validación de T1 no aumentar
 El bucle de reparación intervino en 9 de las 36 corridas de T1, y todas convergieron en la primera reparación: 7 por variables sensibles con valor por defecto, rechazadas por la revisión estática, y 2 por un argumento inexistente detectado por `validate`. El piloto mostró que, cuando el entorno de validación tiene un defecto, el bucle puede superar el control a costa de una regla de seguridad (24 corridas terminaron con contraseñas en el código), por lo que el diseño de los controles resulta tan importante como el ciclo de reparación. El costo del ciclo es significativo en términos relativos (23 s y 0.016 USD adicionales por corrida, con $p < 0.01$ tras el ajuste de Holm), pero pequeño en términos absolutos.
 
 #### Conclusión C4: Viabilidad Económica, Eficiencia Temporal y Transferibilidad a Producción (Paolo Ramírez)
-La contrastación empírica entre la medición manual cronometrada y el agente autónomo comprobó que el agente reduce el tiempo de desarrollo de infraestructura en un **97.5 %** (de horas a escasos minutos) y disminuye los costos directos de elaboración en un **99.98 %**, requiriendo menos de tres centavos de dólar ($0.027 USD) en cómputo de IA frente a más de $179 USD en valor de horas de consultoría especializada. Además, el despliegue exitoso en Google Cloud Platform de la aplicación *Picantería Digital* (API NestJS, Web Nginx, PostgreSQL 17 y Secret Manager en `southamerica-west1`) valida la capacidad del agente para transferir de manera segura y precisa requerimientos complejos hacia entornos productivos reales bajo supervisión humana estricta.
+La comparación entre la medición manual cronometrada y el agente (T1) en tres escenarios, uno por nivel, mostró que el agente reduce el tiempo de elaboración del código en un **98.7 %** (de 3.25 horas a 2.6 minutos, sin contar la revisión humana) y el costo directo en un **99.95 %**, con menos de nueve centavos de dólar (0.087 USD) en tokens frente a 179 USD en horas de ingeniería. Por tratarse de una sola persona y de tres escenarios, el ahorro es una estimación y no un resultado generalizable. Además, el despliegue exitoso en Google Cloud Platform de la aplicación *Picantería Digital* (API NestJS, Web Nginx, PostgreSQL 17 y Secret Manager en `southamerica-west1`) valida la capacidad del agente para transferir de manera segura y precisa requerimientos complejos hacia entornos productivos reales bajo supervisión humana estricta.
 
 ---
 

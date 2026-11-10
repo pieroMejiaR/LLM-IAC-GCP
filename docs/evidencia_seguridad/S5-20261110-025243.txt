@@ -1,0 +1,22 @@
+S5 · La cuenta Viewer no puede crear recursos
+Fecha: 2026-11-10T02:52:43+00:00   Contenedor: c14759f3445a   Usuario: uid=10001
+Proxy de salida: http://proxy:3128
+
+Proyecto: agente-iac-pm   Región: southamerica-west1
+Cuenta suplantada: agente-viewer@agente-iac-pm.iam.gserviceaccount.com
+Bucket que se intenta crear: agente-iac-pm-s5-4b848e
+
+[OK] terraform init (proveedor del espejo local)
+       esperado: termina bien
+       obtenido: código 0
+[OK] terraform plan con la cuenta Viewer (lo que sí hace el modo evaluación)
+       esperado: termina bien: la cuenta puede leer
+       obtenido: código 0. Terraform used the selected providers to generate the following execution | plan. Resource actions are indicated with the following symbols:
+[OK] terraform apply con la cuenta Viewer (crear el bucket)
+       esperado: falla por permisos (403, storage.buckets.create)
+       obtenido: código 1. Error: googleapi: Error 403: agente-viewer@agente-iac-pm.iam.gserviceaccount.com does not have storage.buckets.create access to the Google Cloud project. Permission 'storage.buckets.create' denied on resource '//storage.googleapis.com/projects/_/buckets/agente-iac-pm-s5-4b848e' (or it may not exist)., forbidden
+[OK] Estado de Terraform después del apply
+       esperado: sin recursos creados
+       obtenido: vacío
+
+Resultado: 4/4 comprobaciones dieron lo esperado
