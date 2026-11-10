@@ -190,3 +190,10 @@ Sin este archivo el agente funciona, pero el grounding usa solo las notas del ca
 - `GCP_CUENTA_DESPLIEGUE`: roles limitados a los servicios del caso (por ejemplo, `roles/run.admin`, `roles/iam.serviceAccountUser` y los que el caso requiera). Solo la usa `agent desplegar`.
 
 Quien ejecuta necesita `roles/iam.serviceAccountTokenCreator` sobre ambas cuentas.
+
+Para el caso real, la cuenta de despliegue usa `roles/run.admin`, `roles/iam.serviceAccountAdmin`, `roles/iam.serviceAccountUser`, `roles/cloudsql.admin`, `roles/secretmanager.admin` y `roles/resourcemanager.projectIamAdmin` en el proyecto, y **`roles/artifactregistry.reader` sobre el repositorio de imágenes**. Este último es necesario porque, al crear un servicio, Cloud Run comprueba que quien despliega pueda leer la imagen; sin él, `apply` falla con *Permission 'artifactregistry.repositories.downloadArtifacts' denied* después de haber creado la base de datos (ocurrió en el primer intento del despliegue real):
+
+```bash
+gcloud artifacts repositories add-iam-policy-binding apps --location=southamerica-west1 \
+  --member="serviceAccount:agente-deploy@PROYECTO.iam.gserviceaccount.com" --role="roles/artifactregistry.reader"
+```
