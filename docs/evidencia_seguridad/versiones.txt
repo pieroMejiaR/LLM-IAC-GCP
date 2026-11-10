@@ -1,0 +1,18 @@
+versiones · Versiones del sandbox (sección 4.1)
+Fecha: 2026-11-05T13:39:27+00:00   Contenedor: 6608dc1eae5f   Usuario: uid=10001
+Proxy de salida: http://proxy:3128
+
+  Terraform                    1.16.7
+  Proveedor hashicorp/google   8.8.1
+  Proveedor hashicorp/google-beta 8.8.1
+  TFLint                       0.65.0
+  Ruleset google de TFLint     0.40.0
+  Checkov                      3.3.30
+  Python                       3.12.15
+  litellm                      1.105.3
+  pydantic                     2.14.3
+  typer                        0.27.3
+  pyyaml                       6.0.3
+  pytest                       9.2.0
+
+Resultado: 12/12 comprobaciones dieron lo esperado
