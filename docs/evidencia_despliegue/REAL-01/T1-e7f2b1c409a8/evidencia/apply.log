@@ -41,5 +41,5 @@ Apply complete! Resources: 14 added, 0 changed, 0 destroyed.
 
 Outputs:
 
-api_url = "https://picanteria-api-4a78-uc.a.run.app"
-service_url = "https://picanteria-web-4a78-uc.a.run.app"
+api_url = "https://picanteria-api-e7f2b1c409a8-tl.a.run.app"
+service_url = "https://picanteria-web-e7f2b1c409a8-tl.a.run.app"

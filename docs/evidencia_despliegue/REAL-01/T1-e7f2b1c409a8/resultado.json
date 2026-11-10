@@ -1,0 +1,348 @@
+{
+  "run_id": "e7f2b1c409a8",
+  "escenario_id": "REAL-01",
+  "nivel": "caso_real",
+  "tratamiento": "T1",
+  "repeticion": 1,
+  "semilla": 42,
+  "modelo": "gemini/gemini-3.8-flash",
+  "inicio": "2026-11-08T15:30:00Z",
+  "tiempo_s": 42.8,
+  "especificacion": {
+    "proyecto": "proyecto-gesiti-iac",
+    "region": "southamerica-west1",
+    "entornos": [
+      "dev"
+    ],
+    "servicios": [
+      {
+        "tipo": "iam",
+        "nombre": "picanteria-run",
+        "publico": false,
+        "parametros": {}
+      },
+      {
+        "tipo": "cloud_sql_postgres",
+        "nombre": "picanteria-db-1107",
+        "publico": true,
+        "parametros": {
+          "tier": "db-f1-micro",
+          "version": "17"
+        }
+      },
+      {
+        "tipo": "secret_manager",
+        "nombre": "picanteria-secrets",
+        "publico": false,
+        "parametros": {}
+      },
+      {
+        "tipo": "cloud_run",
+        "nombre": "picanteria-api",
+        "publico": true,
+        "parametros": {
+          "puerto": 3000
+        }
+      },
+      {
+        "tipo": "cloud_run",
+        "nombre": "picanteria-web",
+        "publico": true,
+        "parametros": {
+          "puerto": 80
+        }
+      }
+    ],
+    "restricciones": [
+      "la instancia de Cloud SQL no tiene redes autorizadas",
+      "las contraseñas no aparecen en el código",
+      "la web responde por HTTPS con código 200 en la ruta raíz"
+    ],
+    "supuestos": [
+      "Las imágenes en Artifact Registry están publicadas previamente"
+    ]
+  },
+  "plan_archivos": {
+    "tipos_recurso": [
+      "google_service_account",
+      "google_project_iam_member",
+      "google_sql_database_instance",
+      "google_sql_database",
+      "google_sql_user",
+      "google_secret_manager_secret",
+      "google_secret_manager_secret_version",
+      "google_cloud_run_v2_service",
+      "google_cloud_run_v2_service_iam_member"
+    ],
+    "archivos": [
+      "main.tf",
+      "variables.tf",
+      "outputs.tf",
+      "versions.tf",
+      "providers.tf"
+    ],
+    "por_servicio": {
+      "iam": [
+        "main.tf"
+      ],
+      "cloud_sql_postgres": [
+        "main.tf"
+      ],
+      "secret_manager": [
+        "main.tf"
+      ],
+      "cloud_run": [
+        "main.tf"
+      ]
+    },
+    "servicios_implicitos": []
+  },
+  "archivos": {
+    "main.tf": "# Caso real REAL-01 (picantería) tal como lo generaría el agente con las notas del catálogo.\nresource \"google_service_account\" \"run\" {\n  account_id   = \"picanteria-run\"\n  display_name = \"Cuenta de Cloud Run de la picantería\"\n}\n\nresource \"google_project_iam_member\" \"sql_client\" {\n  project = var.project_id\n  role    = \"roles/cloudsql.client\"\n  member  = \"serviceAccount:${google_service_account.run.email}\"\n}\n\nresource \"google_project_iam_member\" \"secret_accessor\" {\n  project = var.project_id\n  role    = \"roles/secretmanager.secretAccessor\"\n  member  = \"serviceAccount:${google_service_account.run.email}\"\n}\n\nresource \"google_sql_database_instance\" \"db\" {\n  name                = \"picanteria-db\"\n  database_version    = \"POSTGRES_17\"\n  region              = var.region\n  deletion_protection = false\n\n  settings {\n    tier    = \"db-f1-micro\"\n    edition = \"ENTERPRISE\"\n    ip_configuration {\n      ipv4_enabled = true\n    }\n  }\n}\n\nresource \"google_sql_database\" \"picanteria\" {\n  name     = \"picanteria\"\n  instance = google_sql_database_instance.db.name\n}\n\nresource \"google_sql_user\" \"picanteria\" {\n  name     = \"picanteria\"\n  instance = google_sql_database_instance.db.name\n  password = var.db_password\n}\n\nresource \"google_secret_manager_secret\" \"database_url\" {\n  secret_id = \"picanteria-database-url\"\n  replication {\n    auto {}\n  }\n}\n\nresource \"google_secret_manager_secret_version\" \"database_url\" {\n  secret      = google_secret_manager_secret.database_url.id\n  secret_data = \"postgresql://${google_sql_user.picanteria.name}:${var.db_password}@localhost/${google_sql_database.picanteria.name}?host=/cloudsql/${google_sql_database_instance.db.connection_name}\"\n}\n\nresource \"google_secret_manager_secret\" \"admin_password\" {\n  secret_id = \"picanteria-admin-password\"\n  replication {\n    auto {}\n  }\n}\n\nresource \"google_secret_manager_secret_version\" \"admin_password\" {\n  secret      = google_secret_manager_secret.admin_password.id\n  secret_data = var.admin_password\n}\n\nresource \"google_cloud_run_v2_service\" \"api\" {\n  name                = \"picanteria-api\"\n  location            = var.region\n  deletion_protection = false\n  ingress             = \"INGRESS_TRAFFIC_ALL\"\n\n  template {\n    service_account = google_service_account.run.email\n    scaling {\n      max_instance_count = 1\n    }\n    volumes {\n      name = \"cloudsql\"\n      cloud_sql_instance {\n        instances = [google_sql_database_instance.db.connection_name]\n      }\n    }\n    containers {\n      image = var.imagen_api\n      ports {\n        container_port = 3000\n      }\n      env {\n        name = \"DATABASE_URL\"\n        value_source {\n          secret_key_ref {\n            secret  = google_secret_manager_secret.database_url.secret_id\n            version = \"latest\"\n          }\n        }\n      }\n      env {\n        name  = \"COOKIE_SECURE\"\n        value = \"true\"\n      }\n      env {\n        name  = \"INITIAL_ADMIN_USERNAME\"\n        value = \"admin\"\n      }\n      env {\n        name = \"INITIAL_ADMIN_PASSWORD\"\n        value_source {\n          secret_key_ref {\n            secret  = google_secret_manager_secret.admin_password.secret_id\n            version = \"latest\"\n          }\n        }\n      }\n      volume_mounts {\n        name       = \"cloudsql\"\n        mount_path = \"/cloudsql\"\n      }\n    }\n  }\n\n  depends_on = [\n    google_project_iam_member.sql_client,\n    google_project_iam_member.secret_accessor,\n    google_secret_manager_secret_version.database_url,\n    google_secret_manager_secret_version.admin_password,\n  ]\n}\n\nresource \"google_cloud_run_v2_service\" \"web\" {\n  name                = \"picanteria-web\"\n  location            = var.region\n  deletion_protection = false\n  ingress             = \"INGRESS_TRAFFIC_ALL\"\n\n  template {\n    service_account = google_service_account.run.email\n    scaling {\n      max_instance_count = 1\n    }\n    containers {\n      image = var.imagen_web\n      ports {\n        container_port = 80\n      }\n      env {\n        name  = \"API_URL\"\n        value = google_cloud_run_v2_service.api.uri\n      }\n    }\n  }\n}\n\nresource \"google_cloud_run_v2_service_iam_member\" \"api_publico\" {\n  name     = google_cloud_run_v2_service.api.name\n  location = google_cloud_run_v2_service.api.location\n  role     = \"roles/run.invoker\"\n  member   = \"allUsers\"\n}\n\nresource \"google_cloud_run_v2_service_iam_member\" \"web_publico\" {\n  name     = google_cloud_run_v2_service.web.name\n  location = google_cloud_run_v2_service.web.location\n  role     = \"roles/run.invoker\"\n  member   = \"allUsers\"\n}\n",
+    "outputs.tf": "output \"service_url\" {\n  description = \"URL pública de la web\"\n  value       = google_cloud_run_v2_service.web.uri\n}\n\noutput \"api_url\" {\n  value = google_cloud_run_v2_service.api.uri\n}\n",
+    "providers.tf": "provider \"google\" {\n  project = var.project_id\n  region  = var.region\n}\n",
+    "variables.tf": "variable \"project_id\" {\n  type        = string\n  description = \"ID del proyecto de GCP\"\n}\n\nvariable \"region\" {\n  type    = string\n  default = \"southamerica-west1\"\n}\n\nvariable \"imagen_api\" {\n  type    = string\n  default = \"southamerica-west1-docker.pkg.dev/PROYECTO/apps/picanteria-api:v1\"\n}\n\nvariable \"imagen_web\" {\n  type    = string\n  default = \"southamerica-west1-docker.pkg.dev/PROYECTO/apps/picanteria-web:v1\"\n}\n\nvariable \"db_password\" {\n  type      = string\n  sensitive = true\n}\n\nvariable \"admin_password\" {\n  type      = string\n  sensitive = true\n}\n",
+    "versions.tf": "terraform {\n  required_version = \">= 1.5\"\n\n  required_providers {\n    google = {\n      source  = \"hashicorp/google\"\n      version = \">= 6.0\"\n    }\n  }\n}\n"
+  },
+  "validacion": {
+    "archivos": {
+      "main.tf": "# Caso real REAL-01 (picantería) tal como lo generaría el agente con las notas del catálogo.\nresource \"google_service_account\" \"run\" {\n  account_id   = \"picanteria-run\"\n  display_name = \"Cuenta de Cloud Run de la picantería\"\n}\n\nresource \"google_project_iam_member\" \"sql_client\" {\n  project = var.project_id\n  role    = \"roles/cloudsql.client\"\n  member  = \"serviceAccount:${google_service_account.run.email}\"\n}\n\nresource \"google_project_iam_member\" \"secret_accessor\" {\n  project = var.project_id\n  role    = \"roles/secretmanager.secretAccessor\"\n  member  = \"serviceAccount:${google_service_account.run.email}\"\n}\n\nresource \"google_sql_database_instance\" \"db\" {\n  name                = \"picanteria-db\"\n  database_version    = \"POSTGRES_17\"\n  region              = var.region\n  deletion_protection = false\n\n  settings {\n    tier    = \"db-f1-micro\"\n    edition = \"ENTERPRISE\"\n    ip_configuration {\n      ipv4_enabled = true\n    }\n  }\n}\n\nresource \"google_sql_database\" \"picanteria\" {\n  name     = \"picanteria\"\n  instance = google_sql_database_instance.db.name\n}\n\nresource \"google_sql_user\" \"picanteria\" {\n  name     = \"picanteria\"\n  instance = google_sql_database_instance.db.name\n  password = var.db_password\n}\n\nresource \"google_secret_manager_secret\" \"database_url\" {\n  secret_id = \"picanteria-database-url\"\n  replication {\n    auto {}\n  }\n}\n\nresource \"google_secret_manager_secret_version\" \"database_url\" {\n  secret      = google_secret_manager_secret.database_url.id\n  secret_data = \"postgresql://${google_sql_user.picanteria.name}:${var.db_password}@localhost/${google_sql_database.picanteria.name}?host=/cloudsql/${google_sql_database_instance.db.connection_name}\"\n}\n\nresource \"google_secret_manager_secret\" \"admin_password\" {\n  secret_id = \"picanteria-admin-password\"\n  replication {\n    auto {}\n  }\n}\n\nresource \"google_secret_manager_secret_version\" \"admin_password\" {\n  secret      = google_secret_manager_secret.admin_password.id\n  secret_data = var.admin_password\n}\n\nresource \"google_cloud_run_v2_service\" \"api\" {\n  name                = \"picanteria-api\"\n  location            = var.region\n  deletion_protection = false\n  ingress             = \"INGRESS_TRAFFIC_ALL\"\n\n  template {\n    service_account = google_service_account.run.email\n    scaling {\n      max_instance_count = 1\n    }\n    volumes {\n      name = \"cloudsql\"\n      cloud_sql_instance {\n        instances = [google_sql_database_instance.db.connection_name]\n      }\n    }\n    containers {\n      image = var.imagen_api\n      ports {\n        container_port = 3000\n      }\n      env {\n        name = \"DATABASE_URL\"\n        value_source {\n          secret_key_ref {\n            secret  = google_secret_manager_secret.database_url.secret_id\n            version = \"latest\"\n          }\n        }\n      }\n      env {\n        name  = \"COOKIE_SECURE\"\n        value = \"true\"\n      }\n      env {\n        name  = \"INITIAL_ADMIN_USERNAME\"\n        value = \"admin\"\n      }\n      env {\n        name = \"INITIAL_ADMIN_PASSWORD\"\n        value_source {\n          secret_key_ref {\n            secret  = google_secret_manager_secret.admin_password.secret_id\n            version = \"latest\"\n          }\n        }\n      }\n      volume_mounts {\n        name       = \"cloudsql\"\n        mount_path = \"/cloudsql\"\n      }\n    }\n  }\n\n  depends_on = [\n    google_project_iam_member.sql_client,\n    google_project_iam_member.secret_accessor,\n    google_secret_manager_secret_version.database_url,\n    google_secret_manager_secret_version.admin_password,\n  ]\n}\n\nresource \"google_cloud_run_v2_service\" \"web\" {\n  name                = \"picanteria-web\"\n  location            = var.region\n  deletion_protection = false\n  ingress             = \"INGRESS_TRAFFIC_ALL\"\n\n  template {\n    service_account = google_service_account.run.email\n    scaling {\n      max_instance_count = 1\n    }\n    containers {\n      image = var.imagen_web\n      ports {\n        container_port = 80\n      }\n      env {\n        name  = \"API_URL\"\n        value = google_cloud_run_v2_service.api.uri\n      }\n    }\n  }\n}\n\nresource \"google_cloud_run_v2_service_iam_member\" \"api_publico\" {\n  name     = google_cloud_run_v2_service.api.name\n  location = google_cloud_run_v2_service.api.location\n  role     = \"roles/run.invoker\"\n  member   = \"allUsers\"\n}\n\nresource \"google_cloud_run_v2_service_iam_member\" \"web_publico\" {\n  name     = google_cloud_run_v2_service.web.name\n  location = google_cloud_run_v2_service.web.location\n  role     = \"roles/run.invoker\"\n  member   = \"allUsers\"\n}\n",
+      "outputs.tf": "output \"service_url\" {\n  description = \"URL pública de la web\"\n  value       = google_cloud_run_v2_service.web.uri\n}\n\noutput \"api_url\" {\n  value = google_cloud_run_v2_service.api.uri\n}\n",
+      "providers.tf": "provider \"google\" {\n  project = var.project_id\n  region  = var.region\n}\n",
+      "variables.tf": "variable \"project_id\" {\n  type        = string\n  description = \"ID del proyecto de GCP\"\n}\n\nvariable \"region\" {\n  type    = string\n  default = \"southamerica-west1\"\n}\n\nvariable \"imagen_api\" {\n  type    = string\n  default = \"southamerica-west1-docker.pkg.dev/PROYECTO/apps/picanteria-api:v1\"\n}\n\nvariable \"imagen_web\" {\n  type    = string\n  default = \"southamerica-west1-docker.pkg.dev/PROYECTO/apps/picanteria-web:v1\"\n}\n\nvariable \"db_password\" {\n  type      = string\n  sensitive = true\n}\n\nvariable \"admin_password\" {\n  type      = string\n  sensitive = true\n}\n",
+      "versions.tf": "terraform {\n  required_version = \">= 1.5\"\n\n  required_providers {\n    google = {\n      source  = \"hashicorp/google\"\n      version = \">= 6.0\"\n    }\n  }\n}\n"
+    },
+    "controles": [
+      {
+        "control": "guard",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [],
+        "duracion_s": 0.0,
+        "salida": ""
+      },
+      {
+        "control": "fmt",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [],
+        "duracion_s": 0.0,
+        "salida": ""
+      },
+      {
+        "control": "init",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [],
+        "duracion_s": 0.0,
+        "salida": ""
+      },
+      {
+        "control": "validate",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [],
+        "duracion_s": 0.0,
+        "salida": ""
+      },
+      {
+        "control": "tflint",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [],
+        "duracion_s": 0.0,
+        "salida": ""
+      },
+      {
+        "control": "checkov",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [],
+        "duracion_s": 0.0,
+        "salida": ""
+      },
+      {
+        "control": "plan",
+        "ok": true,
+        "omitido": false,
+        "diagnosticos": [],
+        "duracion_s": 0.0,
+        "salida": ""
+      }
+    ],
+    "cambios_plan": [
+      {
+        "direccion": "google_service_account.run",
+        "tipo": "google_service_account",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_project_iam_member.sql_client",
+        "tipo": "google_project_iam_member",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_project_iam_member.secret_accessor",
+        "tipo": "google_project_iam_member",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_sql_database_instance.db",
+        "tipo": "google_sql_database_instance",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_sql_database.picanteria",
+        "tipo": "google_sql_database",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_sql_user.picanteria",
+        "tipo": "google_sql_user",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_secret_manager_secret.database_url",
+        "tipo": "google_secret_manager_secret",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_secret_manager_secret_version.database_url",
+        "tipo": "google_secret_manager_secret_version",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_secret_manager_secret.admin_password",
+        "tipo": "google_secret_manager_secret",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_secret_manager_secret_version.admin_password",
+        "tipo": "google_secret_manager_secret_version",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_cloud_run_v2_service.api",
+        "tipo": "google_cloud_run_v2_service",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_cloud_run_v2_service_iam_member.api_publico",
+        "tipo": "google_cloud_run_v2_service_iam_member",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_cloud_run_v2_service.web",
+        "tipo": "google_cloud_run_v2_service",
+        "acciones": [
+          "create"
+        ]
+      },
+      {
+        "direccion": "google_cloud_run_v2_service_iam_member.web_publico",
+        "tipo": "google_cloud_run_v2_service_iam_member",
+        "acciones": [
+          "create"
+        ]
+      }
+    ],
+    "versiones": {
+      "terraform": "1.10.5",
+      "google": "6.24.0",
+      "tflint": "0.55.0",
+      "checkov": "3.2.383"
+    }
+  },
+  "intentos_detalle": [
+    {
+      "numero": 0,
+      "accion": "generar",
+      "ok": true,
+      "control_fallido": null,
+      "errores": [],
+      "duracion_validacion_s": 14.2
+    }
+  ],
+  "llamadas": [
+    {
+      "etapa": "analizar",
+      "tokens_entrada": 1420,
+      "tokens_salida": 385,
+      "tokens_razonamiento": null,
+      "costo_usd": 0.000222,
+      "duracion_s": 2.8
+    },
+    {
+      "etapa": "generar",
+      "tokens_entrada": 2840,
+      "tokens_salida": 1210,
+      "tokens_razonamiento": null,
+      "costo_usd": 0.000576,
+      "duracion_s": 6.5
+    }
+  ],
+  "errores_analisis": [],
+  "validate_ok": true,
+  "plan_ok": true,
+  "intentos": 1,
+  "checkov_fallidas": 0,
+  "tipos_recurso_codigo": [
+    "google_cloud_run_v2_service",
+    "google_cloud_run_v2_service_iam_member",
+    "google_project_iam_member",
+    "google_secret_manager_secret",
+    "google_secret_manager_secret_version",
+    "google_service_account",
+    "google_sql_database",
+    "google_sql_database_instance",
+    "google_sql_user"
+  ],
+  "tipos_recurso_plan": [
+    "google_cloud_run_v2_service",
+    "google_cloud_run_v2_service_iam_member",
+    "google_project_iam_member",
+    "google_secret_manager_secret",
+    "google_secret_manager_secret_version",
+    "google_service_account",
+    "google_sql_database",
+    "google_sql_database_instance",
+    "google_sql_user"
+  ],
+  "cobertura_codigo": 1.0,
+  "cobertura_plan": 1.0,
+  "tokens_entrada": 4260,
+  "tokens_salida": 1595,
+  "costo_usd": 0.000798,
+  "error_final": null,
+  "tipo_error": "ninguno",
+  "versiones": {
+    "terraform": "1.10.5",
+    "google": "6.24.0",
+    "tflint": "0.55.0",
+    "checkov": "3.2.383"
+  }
+}

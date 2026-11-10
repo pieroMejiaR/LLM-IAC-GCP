@@ -15,3 +15,6 @@ __pycache__/
 # Resultados locales (se suben solo los consolidados del experimento)
 resultados/
 grounding/esquema_completo.json
+
+# Documentos generados localmente
+*.docx

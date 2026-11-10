@@ -7,8 +7,8 @@
     {
       "servicio": "Cloud Run (API y Web)",
       "unidades": "2 servicios v2, max 1 instancia",
-      "costo_estimado_hora_usd": 0.000048,
-      "costo_facturado_sesion_usd": 0.000036,
+      "costo_estimado_hora_usd": 4.8e-05,
+      "costo_facturado_sesion_usd": 3.6e-05,
       "nota": "Dentro del nivel gratuito / cómputo bajo demanda por solicitud activa"
     },
     {
@@ -21,15 +21,15 @@
     {
       "servicio": "Secret Manager",
       "unidades": "2 secretos, 2 versiones activas",
-      "costo_estimado_hora_usd": 0.000016,
-      "costo_facturado_sesion_usd": 0.000012,
+      "costo_estimado_hora_usd": 1.6e-05,
+      "costo_facturado_sesion_usd": 1.2e-05,
       "nota": "Facturación por versión activa al mes ($0.06/secreto/mes)"
     },
     {
       "servicio": "Artifact Registry",
       "unidades": "2 imágenes (~320 MB total)",
-      "costo_estimado_hora_usd": 0.000044,
-      "costo_facturado_sesion_usd": 0.000033,
+      "costo_estimado_hora_usd": 4.4e-05,
+      "costo_facturado_sesion_usd": 3.3e-05,
       "nota": "Almacenamiento de capas de contenedores"
     },
     {

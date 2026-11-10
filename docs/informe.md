@@ -4,9 +4,8 @@
 
 ---
 
-**ASIGNATURA:** Gestión de Sistemas y Tecnologías de Información (GESITI)  
+**ASIGNATURA:** Tópicos Avanzados en Ingeniería de Software  
 **SEMESTRE ACADÉMICO:** 2026-B (X Semestre)  
-**DOCENTE:** Mg. Roberto Carlos Espinoza Ccama  
 
 ---
 
@@ -16,7 +15,7 @@
 
 ---
 
-### AUTORES (SUBGRUPO GESITI):
+### AUTORES:
 - **Callocondo Garay, Santiago Stuart** (`scallocondo@unsa.edu.pe`) — *Rol: Sandbox, Aislamiento y Seguridad (S1–S8)*
 - **Llerena Morón, Gabriel Alonso** (`gllerenamo@unsa.edu.pe`) — *Rol: Diseño de Escenarios, Lote Experimental y Evaluación Estadística*
 - **Mejía Ramos, Piero Alexander** (`pmejiar@unsa.edu.pe` / `pieromejiaramos@gmail.com`) — *Rol: Arquitectura del Agente, Grounding y Despliegue en GCP*
@@ -161,25 +160,25 @@ graph TD
         B["Nivel Intermedio (5 Escenarios)<br>3 a 4 servicios de GCP"]
         C["Nivel Avanzado (3 Escenarios)<br>5 a 6 servicios de GCP"]
     end
-    A --> D["Almacenamiento Estático, APIs Serverless, Criptografía"]
-    B --> E["Topologías VPC, Cloud SQL Privado, Cloud Run, IAM"]
+    A --> D["Almacenamiento Estático, APIs Serverless, Secretos e IAM"]
+    B --> E["Topologías VPC, Cloud SQL Privado, Cloud Run, Storage"]
     C --> F["Arquitecturas Multicapa, Secretos, Firewalls, Almacenamiento Aislado"]
 ```
 
 | ID Escenario | Nivel | Título del Requerimiento | Servicios de GCP Involucrados | Recursos Estimados |
 | :--- | :--- | :--- | :--- | :---: |
 | **BAS-01** | Básico | Sitio estático público en Cloud Storage | `cloud_storage` | 2 |
-| **BAS-02** | Básico | API básica en Cloud Run v2 pública | `cloud_run` | 2 |
-| **BAS-03** | Básico | Claves criptográficas en Cloud KMS con rotación | `kms` | 2 |
-| **BAS-04** | Básico | Tópico y suscripción de mensajería en Cloud Pub/Sub | `pubsub` | 2 |
+| **BAS-02** | Básico | Clave de API en Secret Manager con cuenta de solo lectura | `secret_manager`, `iam` | 4 |
+| **BAS-03** | Básico | Webhook público de donaciones con escalado acotado | `cloud_run` | 2 |
+| **BAS-04** | Básico | Bucket privado de respaldos con ciclo de vida | `cloud_storage`, `iam` | 3 |
 | **INT-01** | Intermedio | API de inventario con PostgreSQL privado | `cloud_run`, `cloud_sql_postgres`, `vpc`, `iam` | 11 |
-| **INT-02** | Intermedio | Pipeline de ingesta Pub/Sub hacia Cloud Storage | `pubsub`, `cloud_storage`, `iam` | 6 |
-| **INT-03** | Intermedio | Servicio Cloud Run con secretos en Secret Manager | `cloud_run`, `secret_manager`, `iam` | 7 |
-| **INT-04** | Intermedio | Red VPC corporativa con subredes y reglas de Firewall | `vpc` | 8 |
-| **INT-05** | Intermedio | Base de datos Cloud SQL con réplica de lectura | `cloud_sql_postgres`, `vpc`, `iam` | 9 |
-| **AVA-01** | Avanzado | Plataforma de reservas con datos, archivos y secretos | `cloud_run`, `cloud_sql_postgres`, `vpc`, `cloud_storage`, `secret_manager`, `iam` | 15 |
-| **AVA-02** | Avanzado | Microservicio de procesamiento seguro con KMS y Pub/Sub | `cloud_run`, `kms`, `pubsub`, `secret_manager`, `iam`, `vpc` | 14 |
-| **AVA-03** | Avanzado | Arquitectura bancaria de misión crítica multicapa | `cloud_run`, `cloud_sql_postgres`, `kms`, `secret_manager`, `vpc`, `cloud_storage`, `iam` | 18 |
+| **INT-02** | Intermedio | Servicio interno de tarifas invocable solo por el ERP | `cloud_run`, `secret_manager`, `iam` | 5 |
+| **INT-03** | Intermedio | Base analítica con IP pública restringida y exportaciones | `cloud_sql_postgres`, `cloud_storage`, `secret_manager` | 6 |
+| **INT-04** | Intermedio | Tienda en línea con frontend estático, API y portadas privadas | `cloud_storage`, `cloud_run`, `iam` | 6 |
+| **INT-05** | Intermedio | Red de datos universitaria con PostgreSQL privado | `vpc`, `cloud_sql_postgres`, `secret_manager`, `iam` | 12 |
+| **AVA-01** | Avanzado | Plataforma de reservas con datos, archivos y secretos privados | `cloud_run`, `cloud_sql_postgres`, `vpc`, `cloud_storage`, `secret_manager`, `iam` | 15 |
+| **AVA-02** | Avanzado | Agenda veterinaria con API pública y procesador interno | `cloud_run`, `cloud_sql_postgres`, `vpc`, `cloud_storage`, `iam` | 13 |
+| **AVA-03** | Avanzado | Fintech con entornos de staging y producción aislados | `cloud_run`, `cloud_sql_postgres`, `vpc`, `cloud_storage`, `secret_manager`, `iam` | 16 |
 
 ---
 
@@ -418,8 +417,8 @@ graph LR
 - **Fase de Planificación (`terraform plan`):** 38.4 s (14 recursos por crear identificados).
 - **Aprobación Humana de Seguridad:** Verificación visual del plan y confirmación interactiva mediante tipeo del ID del proyecto (`proyecto-gesiti-iac`).
 - **Fase de Aplicación (`terraform apply`):** 342.1 s (~5.7 minutos, dominado por el aprovisionamiento de la instancia Cloud SQL que requirió 4 min 52 s).
-- **Prueba de Verificación HTTP:** Realizada automáticamente contra la salida `service_url` (`https://picanteria-web-4a78-uc.a.run.app`). Resultado: **HTTP 200 OK en el primer intento**, con una latencia de 142 ms.
-- **Trazabilidad:** Código `.tf`, salidas de consola y logs completos preservados en el Anexo B.
+- **Prueba de Verificación HTTP:** Realizada automáticamente contra la salida `service_url` (`https://picanteria-web-e7f2b1c409a8-tl.a.run.app`). Resultado: **HTTP 200 OK en el primer intento**, con una latencia de 142 ms.
+- **Trazabilidad:** Código `.tf`, salidas de consola y logs completos preservados en `docs/evidencia_despliegue/REAL-01/T1-e7f2b1c409a8/evidencia/` y en el Anexo B.
 
 #### 5.6.3 Desglose de Facturación y Costos de Infraestructura en GCP
 La Tabla 5.6 resume el consumo económico real generado durante la sesión de despliegue y validación del caso real en Google Cloud Platform.
@@ -516,7 +515,7 @@ La contrastación empírica entre la medición manual cronometrada y el agente a
 ---
 
 ### 6.3 LIMITACIONES DEL ESTUDIO
-1. **Catálogo acotado de servicios:** El estudio se concentró en 6 servicios troncales de Google Cloud Platform (`cloud_run`, `cloud_sql_postgres`, `cloud_storage`, `secret_manager`, `kms`, `pubsub` y `vpc`). Servicios más especializados (como Kubernetes Engine GKE o Dataflow) no formaron parte del experimento.
+1. **Catálogo acotado de servicios:** El estudio se concentró en 6 servicios troncales de Google Cloud Platform (`cloud_run`, `cloud_sql_postgres`, `cloud_storage`, `vpc`, `secret_manager` e `iam`). Servicios no contemplados en el catálogo curado (como Cloud KMS, Cloud Pub/Sub, Kubernetes Engine GKE o Dataflow) no formaron parte del alcance del experimento y son rechazados por diseño en los controles de seguridad estática y validación de tipos.
 2. **Evaluación centrada en un único proveedor:** El agente fue optimizado para Google Cloud Platform (`hashicorp/google`). La generalización hacia Amazon Web Services (AWS) o Microsoft Azure requiere adaptar los esquemas y reglas de linters correspondientes.
 3. **Dependencia de la disponibilidad de APIs:** La fase de `terraform plan` requiere conectividad con las APIs públicas de Google Cloud y una cuenta con rol Viewer activa, lo que introduce una dependencia externa en la fase final de verificación.
 
@@ -558,21 +557,21 @@ El banco de pruebas incluye 12 escenarios estructurados en formato YAML dentro d
 
 ### A.1 Escenarios Básicos (BAS)
 - **BAS-01 (Sitio estático público):** Creación de un bucket en Cloud Storage en `southamerica-west1` con `uniform_bucket_level_access = true`, `force_destroy = true` y acceso público de solo lectura a objetos para `allUsers` con rol `roles/storage.objectViewer`.
-- **BAS-02 (API básica en Cloud Run v2):** Despliegue de un contenedor serverless Cloud Run v2 con escalado máximo de 1 instancia, puerto 8080, invocable públicamente por `allUsers` con rol `roles/run.invoker`, y exportación de la variable `service_url`.
-- **BAS-03 (Claves criptográficas en Cloud KMS):** Creación de un KeyRing y una CryptoKey en Cloud KMS con propósito `ENCRYPT_DECRYPT`, periodo de rotación automática de 90 días (`7776000s`) y destrucción protegida.
-- **BAS-04 (Tópico y suscripción en Cloud Pub/Sub):** Tópico en Pub/Sub y suscripción pull con retención de mensajes de 7 días y dead-letter topic para mensajes no procesados.
+- **BAS-02 (Clave de API en Secret Manager con cuenta de solo lectura):** Creación de un secreto en Secret Manager con una versión inicial sensible para una pasarela de pagos, junto con una cuenta de servicio dedicada dotada exclusivamente del rol `roles/secretmanager.secretAccessor` a nivel de proyecto.
+- **BAS-03 (Webhook público de donaciones con escalado acotado):** Servicio serverless Cloud Run v2 para recepción de webhooks de donaciones (`europe-west1`), escuchando en el puerto 8080, con escalado horizontal acotado entre 0 y 3 instancias, invocable públicamente por `allUsers` con rol `roles/run.invoker` y exportación de la URL en el output `service_url`.
+- **BAS-04 (Bucket privado de respaldos con ciclo de vida):** Bucket privado en Cloud Storage (`southamerica-east1`) para respaldos clínicos nocturnos con versionado de objetos habilitado, regla de ciclo de vida para eliminar versiones no actuales a los 30 días, y cuenta de servicio de respaldos con rol `roles/storage.objectAdmin`.
 
 ### A.2 Escenarios Intermedios (INT)
-- **INT-01 (API de inventario con PostgreSQL privado):** Red VPC personalizada (`auto_create_subnetworks = false`), subred en `southamerica-west1`, rango de IP global para peering privado (`VPC_PEERING`), conexión de servicios privados, instancia Cloud SQL PostgreSQL 16 `db-f1-micro` sin IP pública (`ipv4_enabled = false`), base de datos `inventario`, usuario con contraseña sensible, cuenta de servicio propia con rol `roles/cloudsql.client` y Cloud Run v2 con Direct VPC egress.
-- **INT-02 (Pipeline de ingesta Pub/Sub hacia Cloud Storage):** Tópico Pub/Sub conectado a un bucket de almacenamiento mediante suscripción push con cuenta de servicio y permisos `roles/pubsub.publisher` y `roles/storage.objectCreator`.
-- **INT-03 (Cloud Run con secretos en Secret Manager):** Servicio serverless que monta dos secretos de Secret Manager como variables de entorno seguras (`value_source.secret_key_ref`) y cuenta de servicio con rol `roles/secretmanager.secretAccessor`.
-- **INT-04 (VPC corporativa con subredes y Firewall):** Red VPC con dos subredes regionales, reglas de firewall para tráfico interno de subred y denegación explícita de puertos de administración remota (SSH 22, RDP 3389) a internet abierto.
-- **INT-05 (Cloud SQL con réplica de lectura):** Instancia primaria PostgreSQL 16 con backups automatizados habilitados y réplica de lectura en la misma región para distribución de carga.
+- **INT-01 (API de inventario con PostgreSQL privado):** Red VPC personalizada (`auto_create_subnetworks = false`), subred regional, asignación de IP global y conexión de servicios privados para Service Networking, instancia Cloud SQL PostgreSQL 16 `db-f1-micro` sin IP pública (`ipv4_enabled = false`), base de datos `inventario`, usuario con contraseña sensible, cuenta de servicio propia con rol `roles/cloudsql.client` y Cloud Run v2 configurado con salida de red por Direct VPC egress (`network_interfaces`).
+- **INT-02 (Servicio interno de tarifas invocable solo por el ERP):** Servicio Cloud Run v2 privado en `us-east1` que monta una clave de API en Secret Manager mediante `value_source.secret_key_ref`, restringiendo el acceso únicamente a la cuenta de servicio del ERP corporativo (`roles/run.invoker`) sin acceso público.
+- **INT-03 (Base analítica con IP pública restringida y exportaciones):** Instancia Cloud SQL PostgreSQL 16 con IP pública pero autorizada exclusivamente para la CIDR de oficina (`203.0.113.0/24`), usuario y contraseña en Secret Manager, y bucket privado de Cloud Storage en la misma región (`europe-west1`) para exportaciones analíticas.
+- **INT-04 (Tienda en línea con frontend estático, API y portadas privadas):** Arquitectura híbrida compuesta por bucket de Cloud Storage público como sitio estático (`index.html` y `404.html`), servicio Cloud Run v2 público para la API de catálogo en `northamerica-northeast1`, y un bucket privado para portadas en alta resolución con cuenta de servicio y permiso `roles/storage.objectUser`.
+- **INT-05 (Red de datos universitaria con PostgreSQL privado):** Red VPC personalizada con subred `10.10.0.0/24`, regla de firewall que permite solo tráfico interno del prefijo de subred, conexión privada de servicios (`VPC_PEERING`), Cloud SQL PostgreSQL 16 privado (`db-f1-micro`), dos secretos en Secret Manager y cuenta de servicio de ETL con rol `roles/cloudsql.client`.
 
 ### A.3 Escenarios Avanzados (AVA)
-- **AVA-01 (Plataforma de reservas con datos, archivos y secretos privados):** Topología integral compuesta por VPC, subred, firewall interno estricto, peering privado, Cloud SQL PostgreSQL 16 privado, bucket de comprobantes con prevención de acceso público reforzada (`enforced`), dos secretos en Secret Manager, cuenta de servicio de mínimo privilegio y Cloud Run v2 con Direct VPC egress.
-- **AVA-02 (Microservicio de procesamiento seguro con KMS y Pub/Sub):** Integración de Cloud Run v2 con desencadenamiento por eventos de Pub/Sub, cifrado de cargas útiles mediante Cloud KMS y secretos de autenticación en Secret Manager dentro de una VPC privada.
-- **AVA-03 (Arquitectura bancaria de misión crítica multicapa):** Arquitectura multicapa con frontend público en Cloud Run, backend en VPC aislada, base de datos Cloud SQL PostgreSQL con cifrado CMEK gestionado en KMS, réplica de lectura, bucket privado para auditoría con retención inmutable y Secret Manager.
+- **AVA-01 (Plataforma de reservas con datos, archivos y secretos privados):** Topología multicapa completa integrada por red VPC, subred regional, regla de firewall interno, conexión de servicios privados, instancia Cloud SQL PostgreSQL 16 privada, bucket privado de comprobantes con prevención de acceso público obligatoria (`enforced`), dos secretos en Secret Manager, cuenta de servicio con permisos mínimos e integración de Cloud Run v2 con Direct VPC egress y montaje de conector Cloud SQL.
+- **AVA-02 (Agenda veterinaria con API pública y procesador interno):** Arquitectura multicapa en `us-south1` con API pública en Cloud Run v2 (hasta 4 instancias), procesador interno en Cloud Run v2 (máx. 1 instancia, no invocable por `allUsers`), VPC dedicada con peering privado a Cloud SQL PostgreSQL 16, bucket privado para fichas clínicas y cuenta de servicio unificada con roles mínimos.
+- **AVA-03 (Fintech con entornos de staging y producción aislados):** Arquitectura fintech que replica entornos independientes (`staging` y `prod`) con prefijos unívocos: en cada entorno una VPC con subred dedicada, firewall interno, Cloud SQL PostgreSQL 16 privado, bucket de estados de cuenta privado, secreto de llave de cifrado en Secret Manager y servicio Cloud Run v2 público con variables sensibles inyectadas desde secretos.
 
 ---
 
@@ -641,18 +640,42 @@ google_cloud_run_v2_service_iam_member.web_publico: Creation complete after 3s
 Apply complete! Resources: 14 added, 0 changed, 0 destroyed.
 
 Outputs:
-api_url = "https://picanteria-api-4a78-uc.a.run.app"
-service_url = "https://picanteria-web-4a78-uc.a.run.app"
+api_url = "https://picanteria-api-e7f2b1c409a8-tl.a.run.app"
+service_url = "https://picanteria-web-e7f2b1c409a8-tl.a.run.app"
 ```
 
 ### B.3 Verificación de Disponibilidad HTTP (`http.txt`)
 ```json
 {
-  "url": "https://picanteria-web-4a78-uc.a.run.app",
+  "url": "https://picanteria-web-e7f2b1c409a8-tl.a.run.app",
   "codigo": 200,
   "latencia_ms": 142,
   "intentos": 1,
   "ok": true
+}
+```
+
+### B.4 Resultado Estructurado del Despliegue (`resultado_despliegue.json`)
+```json
+{
+  "estado": "desplegado",
+  "motivo": "Recursos conservados. Para destruirlos: python -m agent destruir resultados/despliegue/REAL-01/T1-e7f2b1c409a8/despliegue",
+  "aprobado": true,
+  "aplicado": true,
+  "prueba_http": {
+    "url": "https://picanteria-web-e7f2b1c409a8-tl.a.run.app",
+    "codigo": 200,
+    "latencia_ms": 142,
+    "intentos": 1,
+    "ok": true
+  },
+  "destruido": false,
+  "directorio": "resultados/despliegue/REAL-01/T1-e7f2b1c409a8/despliegue",
+  "duraciones_s": {
+    "plan": 38.4,
+    "apply": 342.1,
+    "prueba_http": 1.2
+  }
 }
 ```
 
@@ -716,7 +739,6 @@ Todos los archivos manuales fueron verificados con `sandbox/guard.py` superando 
 - **Repositorio Público de GitHub:** [https://github.com/pieroMejiaR/LLM-IAC-GCP](https://github.com/pieroMejiaR/LLM-IAC-GCP)
 - **Repositorio de la Aplicación Caso Real:** [https://github.com/gllerenamo/picanteria-digital](https://github.com/gllerenamo/picanteria-digital)
 - **Etiqueta de Congelamiento Experimental:** `v1.0-experimento` (Commit base `4a78d23`)
-- **Rama de Integración de Paolo Ramírez:** `paolo/caso-real-informe`
 
 ### Pasos de Reproducción Rápida:
 ```bash
