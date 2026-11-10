@@ -41,11 +41,11 @@
   - [4.2 Componentes del Agente IaC y Modo Despliegue](#42-componentes-del-agente-iac-y-modo-despliegue)
   - [4.3 Procedimiento de Ejecución del Lote Experimental](#43-procedimiento-de-ejecución-del-lote-experimental)
 - [5. Resultados Experimentales y Análisis](#5-resultados-experimentales-y-análisis)
-  - [5.1 Rendimiento Global: Tratamiento T0 frente a Tratamiento T1](#51-rendimiento-global-tratamiento-t0-frente-a-tratamiento-t1)
-  - [5.2 Análisis Estadístico Inferencial: Prueba de Wilcoxon](#52-análisis-estadístico-inferencial-prueba-de-wilcoxon)
-  - [5.3 Análisis de Significancia de Éxito en Validación: Prueba de McNemar](#53-análisis-de-significancia-de-éxito-en-validación-prueba-de-mcnemar)
-  - [5.4 Intervalos de Confianza al 95 % mediante Bootstrap](#54-intervalos-de-confianza-al-95--mediante-bootstrap)
-  - [5.5 Dinámica de Convergencia y Reparación Iterativa](#55-dinámica-de-convergencia-y-reparación-iterativa)
+  - [5.1 Ejecución del Experimento y Lote Piloto](#51-ejecución-del-experimento-y-lote-piloto)
+  - [5.2 Resultados por Tratamiento](#52-resultados-por-tratamiento)
+  - [5.3 Resultados por Nivel de Complejidad](#53-resultados-por-nivel-de-complejidad)
+  - [5.4 Contraste de Hipótesis](#54-contraste-de-hipótesis)
+  - [5.5 Errores y Reparación](#55-errores-y-reparación)
   - [5.6 Despliegue en Google Cloud Platform del Caso Real](#56-despliegue-en-google-cloud-platform-del-caso-real)
   - [5.7 Comparativa de Costo y Tiempo frente a la Elaboración Manual](#57-comparativa-de-costo-y-tiempo-frente-a-la-elaboración-manual)
   - [5.8 Evaluación de Seguridad del Sandbox: Pruebas S1 a S8](#58-evaluación-de-seguridad-del-sandbox-pruebas-s1-a-s8)
@@ -69,7 +69,7 @@ La adopción de Infraestructura como Código (IaC) mediante herramientas declara
 
 El presente trabajo de investigación experimental evalúa el impacto de un agente inteligente basado en Gemini 3.8 Flash provisto de una arquitectura de **grounding técnico** (catálogo de servicios e índice de esquemas del proveedor `hashicorp/google`) acoplado a un **bucle iterativo de validación y reparación automática** operando dentro de un **sandbox confinado en Docker**. Se diseñó un experimento controlado comparando dos tratamientos: **T0** (línea base con prompting directo de un solo paso) y **T1** (agente con grounding, pipeline iterativo y retroalimentación de herramientas formales: `guard` de análisis de AST, `terraform fmt`, `terraform init`, `terraform validate`, `tflint` con reglas de Google, `checkov` para análisis de seguridad estática y `terraform plan` con permisos de solo lectura suplantando una cuenta Viewer).
 
-El experimento evaluó 12 escenarios de complejidad progresiva (4 básicos, 5 intermedios y 3 avanzados) con 3 repeticiones independientes en orden pseudoaleatorio balanceado (72 corridas en total). Los resultados demuestran que el tratamiento **T1 incrementó la tasa de éxito de validación completa del 38.9 % (T0) al 91.7 % (T1)** ($p < 0.001$, prueba de McNemar; $p < 0.001$, prueba de rangos de Wilcoxon). El bucle de reparación convergió en un promedio de 1.42 intentos adicionales, resolviendo el 86.4 % de los defectos en el primer intento correctivo.
+El experimento evaluó 12 escenarios de complejidad progresiva (4 básicos, 5 intermedios y 3 avanzados) con 3 repeticiones por tratamiento en orden aleatorio con semilla fija (72 corridas en total, con un costo de LLM de 1.66 USD). Un lote piloto previo reveló que el entorno de evaluación hacía fallar `terraform plan` por falta de valores en las variables sensibles, y que el bucle de reparación de T1 superaba ese control escribiendo contraseñas en el código; el sandbox se corrigió antes del experimento. Con el entorno corregido, ambos tratamientos superaron `validate` y `plan` en casi todas las corridas (**T0: 97.2 %; T1: 100 %**), sin diferencia significativa (McNemar exacto, $p = 1.0$), por lo que no se rechaza la hipótesis nula. T1 incluyó todos los tipos de recurso esperados (cobertura de 100 % frente a 88.5 % en T0; IC 95 % de la diferencia [4.2 %, 19.4 %]), a cambio de 23 s más por corrida y del doble de costo ($p < 0.01$ tras el ajuste de Holm).
 
 Asimismo, se validó la transferencia a entornos productivos mediante el despliegue real de una aplicación multicontenedor (sistema de pedidos gastronómicos *Picantería Digital*: API NestJS, frontend SPA en Nginx, base de datos Cloud SQL PostgreSQL 17 y Secret Manager en la región `southamerica-west1`). La infraestructura se aprovisionó de manera 100 % autónoma tras aprobación humana explícita del plan en 380.5 s, respondiendo exitosamente a pruebas de disponibilidad HTTP en la primera verificación pública.
 
@@ -132,8 +132,8 @@ El agente desarrollado en esta investigación supera el estado del arte al integ
 
 #### 3.2.2 Variables Experimentales
 - **Variable Independiente (VI):** Tratamiento aplicado a la síntesis de IaC:
-  - **T0 (Línea Base):** Generación de código en un solo paso mediante prompting estructurado con catálogo textual, sin validación en el sandbox ni bucle de reparación.
-  - **T1 (Tratamiento Experimental):** Generación guiada por catálogo y esquema del proveedor, con validación formal en sandbox (`guard`, `fmt`, `init`, `validate`, `tflint`, `checkov`, `plan`) y bucle iterativo de autorreparación guiado por diagnósticos de error (hasta un máximo de 3 reintentos).
+  - **T0 (Línea Base):** Generación del código en una sola llamada al modelo, con las mismas reglas base que T1, pero sin especificación previa, sin el esquema del proveedor y sin bucle de reparación. El código se valida una vez en el sandbox solo para medir el resultado.
+  - **T1 (Tratamiento Experimental):** Generación guiada por catálogo y esquema del proveedor, con validación formal en sandbox (`guard`, `fmt`, `init`, `validate`, `tflint`, `checkov`, `plan`) y bucle iterativo de autorreparación guiado por diagnósticos de error (hasta un máximo de 5 reparaciones).
 - **Variables Dependientes (VD):**
   - **VD1 (Tasa de Éxito de Validación - $S_v$):** Proporción de ejecuciones que superan el 100 % de los controles de validación estática y semántica sin errores bloqueantes.
   - **VD2 (Tasa de Éxito de Plan en GCP - $S_p$):** Proporción de ejecuciones que producen un plan válido contra las APIs reales de Google Cloud suplantando la cuenta Viewer.
@@ -142,7 +142,7 @@ El agente desarrollado en esta investigación supera el estado del arte al integ
   - **VD5 (Costo de Inferencia - $C_i$):** Gasto económico en USD derivado de la suma de tokens de entrada y salida consumidos en el modelo fundacional.
 - **Variables de Control (VC):**
   - Modelo fundacional constante: Gemini 3.8 Flash (`gemini/gemini-3.8-flash`) vía LiteLLM.
-  - Parámetros de muestreo idénticos: temperatura 0.2, top_p 0.95.
+  - Parámetros de muestreo idénticos en ambos tratamientos: los valores por defecto del proveedor (no se fija la temperatura).
   - Versión fija de Terraform (1.16.7) y proveedor Google (8.8.1).
   - Espejo local inmutable de proveedores de Terraform dentro de la imagen Docker.
   - Semilla pseudoaleatoria fija para la aleatorización del orden de corridas del lote experimental.
@@ -189,7 +189,7 @@ El experimento se diseñó con un esquema factorial $12 \times 2 \times 3 = 72$ 
 - 2 tratamientos (T0 y T1).
 - 3 repeticiones por cada combinación escenario-tratamiento para amortiguar la variabilidad estocástica del LLM.
 
-El script de orquestación `eval/run_batch.py` ejecuta las corridas en un orden completamente pseudoaleatorizado generado con semilla fija (`random.seed(42)`). Cada corrida se ejecuta en un directorio temporal aislado, persistiendo el código final generado (`.tf`), el resultado estructurado (`resultado.json`) y registrando la fila consolidada en `resultados/runs.csv` con los metadatos descritos en el Anexo C.
+El script de orquestación `eval/run_batch.py` ejecuta las corridas en un orden completamente pseudoaleatorizado generado con semilla fija (20261105). Cada corrida se ejecuta en un directorio temporal aislado, persistiendo el código final generado (`.tf`), el resultado estructurado (`resultado.json`) y registrando la fila consolidada en `resultados/runs.csv` con los metadatos descritos en el Anexo C.
 
 ```mermaid
 sequenceDiagram
@@ -207,7 +207,7 @@ sequenceDiagram
     Ag->>LLM: Generar código Terraform
     LLM-->>Ag: Archivos HCL (.tf)
     
-    loop Bucle de Validación y Reparación (hasta 3 intentos)
+    loop Bucle de Validación y Reparación (hasta 5 reparaciones)
         Ag->>Guard: Revisar código HCL
         alt Falla Guard
             Guard-->>Ag: Diagnóstico de violación de seguridad
@@ -275,103 +275,128 @@ El agente se organiza en módulos desacoplados con responsabilidades estrictas:
 
 ### 4.3 PROCEDIMIENTO DE EJECUCIÓN DEL LOTE EXPERIMENTAL
 
-Las 72 corridas se ejecutaron mediante la instrucción:
+El piloto y el experimento se ejecutaron con la misma instrucción, cambiando solo la carpeta de salida, y el análisis estadístico se calculó sobre el `runs.csv` resultante:
 ```bash
-docker compose run --rm --entrypoint python agente -m eval.run_batch
+docker compose run --rm --entrypoint python agente -m eval.run_batch --salida resultados/lote-v2
+docker compose run --rm --entrypoint python agente -m eval.analysis resultados/lote-v2/runs.csv
 ```
-El lote registró cada corrida individual en `resultados/runs.csv`, garantizando tolerancia a fallos mediante la bandera `--reanudar` y reportando métricas de éxito, reintentos, tiempo, tokens y costo.
+Cada lote registra una fila por corrida en `runs.csv`, permite continuar un lote interrumpido con la bandera `--reanudar` y guarda la traza completa de cada corrida (`resultado.json`). El piloto (`lote-v1`) se ejecutó con el código de la etiqueta `v1.0-piloto`, y el experimento (`lote-v2`), con el de `v1.1-experimento`, después de corregir el entorno de `plan` (sección 5.1). Los `runs.csv` de ambos lotes y el análisis estadístico están en `docs/experimento/`.
 
 ---
 
 ## 5. RESULTADOS EXPERIMENTALES Y ANÁLISIS
 
-### 5.1 RENDIMIENTO GLOBAL: TRATAMIENTO T0 FRENTE A TRATAMIENTO T1
+Las cifras de esta sección se calculan con `eval/metrics.py` y `eval/analysis.py` a partir de `docs/experimento/lote-v2/runs.csv`. Las tablas completas, con el detalle por escenario, están en `docs/experimento/lote-v2/analisis.md` y `docs/experimento/lote-v2/por_escenario.csv`.
 
-La Tabla 5.1 resume el rendimiento global consolidado en las 72 corridas experimentales del estudio (36 corridas por tratamiento).
+### 5.1 EJECUCIÓN DEL EXPERIMENTO Y LOTE PILOTO
 
-#### Tabla 5.1: Rendimiento Comparativo Global T0 frente a T1
-| Métrica Evaluada | Tratamiento T0 (Línea Base) | Tratamiento T1 (Agente Autónomo) | Variación Relativa / Significancia |
+El 10 de noviembre de 2026 se ejecutó un primer lote de 72 corridas (`lote-v1`, etiqueta `v1.0-piloto`, costo de LLM de 1.77 USD) que cumplió la función de piloto. Su revisión mostró un defecto del entorno de evaluación: `terraform plan` solo recibía los valores de `project_id` y `region`, de modo que todo código que declaraba una contraseña o una clave como variable sensible sin valor por defecto fallaba con el mensaje *No value for required variable*. Ese mensaje explicó 23 de los 24 fallos de T0, que aparentaba una tasa de éxito de `plan` de 33.3 % frente a 100 % en T1. A su vez, T1 superó el control en las 24 corridas que tenían variables sensibles escribiendo valores por defecto como `"ChangeMe123!"`; en 17 de ellas lo hizo como respuesta del bucle de reparación al error de `plan`, en contra de la regla del propio agente que prohíbe escribir secretos en el código.
+
+A partir del piloto se hicieron dos cambios en el sandbox (commit `0bc4930`, etiqueta `v1.1-experimento`). Primero, `plan` recibe un valor de relleno (`TF_VAR_*`) para cada variable sin valor por defecto, igual en ambos tratamientos, de manera que el control mide el código y no la ausencia de valores. Segundo, la revisión estática rechaza las variables marcadas con `sensitive = true` que incluyen un valor por defecto. El lote del experimento (`lote-v2`) se ejecutó con ese código. Los datos del piloto se conservan en `docs/experimento/lote-v1/` y no se usan en el contraste de hipótesis.
+
+#### Tabla 5.1: Ejecución del lote experimental (`lote-v2`)
+| Concepto | Planificado | Ejecutado |
+| :--- | :---: | :---: |
+| Corridas totales | 72 | 72 |
+| Corridas T0 / T1 | 36 / 36 | 36 / 36 |
+| Corridas excluidas por error del entorno | — | 0 |
+| Corridas interrumpidas por excepción | — | 0 |
+| Costo de LLM del experimento | Máximo 15 USD | 1.66 USD |
+| Costo de LLM del piloto | — | 1.77 USD |
+| Tokens de entrada / salida | — | 242 788 / 395 416 |
+| Modelo | `gemini/gemini-3.8-flash` | `gemini/gemini-3.8-flash` |
+| Orden de las corridas | Aleatorio con semilla fija | Semilla 20261105 |
+| `terraform plan` | Cuenta Viewer suplantada | `agente-viewer` en el proyecto `agente-iac-pm` (`southamerica-west1`) |
+| Código evaluado | Commit etiquetado | `v1.1-experimento` (`0bc4930`) |
+| Fecha de ejecución | — | 10 de noviembre de 2026 |
+
+---
+
+### 5.2 RESULTADOS POR TRATAMIENTO
+
+#### Tabla 5.2: Rendimiento global T0 frente a T1 (medias por corrida)
+| Métrica | T0 | T1 | Diferencia (T1 − T0) [IC 95 %] |
 | :--- | :---: | :---: | :---: |
-| **Corridas Totales** | 36 | 36 | — |
-| **Tasa de Éxito en Validación ($S_v$)** | **38.9 %** (14/36) | **91.7 %** (33/36) | **+135.7 %** ($p < 0.001$, McNemar) |
-| **Tasa de Éxito en Básico** | 66.7 % (8/12) | 100.0 % (12/12) | +50.0 % |
-| **Tasa de Éxito en Intermedio** | 33.3 % (5/15) | 93.3 % (14/15) | +180.2 % |
-| **Tasa de Éxito en Avanzado** | 11.1 % (1/9) | 77.8 % (7/9) | +600.9 % |
-| **Cobertura de Recursos del Checklist** | 71.4 % | 98.6 % | +38.1 % ($p < 0.001$, Wilcoxon) |
-| **Número Promedio de Intentos ($N_i$)** | 1.00 (fijo) | 1.42 (rango: 1–3) | Convergencia rápida |
-| **Tiempo Promedio de Respuesta ($T_e$)** | 22.4 s | 68.5 s | +205.8 % (debido al bucle formal) |
-| **Costo Promedio de Inferencia por Corrida** | $0.0042 USD | $0.0098 USD | Inversión marginal (< 1 centavo) |
+| Éxito de validación ($S_v$) | 97.2 % (35/36) | 100.0 % (36/36) | +2.8 % [0.0 %, 8.3 %] |
+| Éxito de plan ($S_p$) | 97.2 % (35/36) | 100.0 % (36/36) | +2.8 % [0.0 %, 8.3 %] |
+| Reparaciones ($N_i$) | 0.00 | 0.25 (máximo 1) | +0.25 [0.08, 0.44] |
+| Tiempo por corrida ($T_e$) | 36.8 s | 59.9 s | +23.1 s [11.2 s, 39.2 s] |
+| Costo por corrida ($C_i$) | 0.0151 USD | 0.0311 USD | +0.0160 USD [0.0084, 0.0257] |
+| Cobertura efectiva de recursos esperados | 88.5 % | 100.0 % | +11.5 % [4.2 %, 19.4 %] |
+| Hallazgos de Checkov por corrida | 8.44 | 9.22 | +0.78 [−0.33, 2.28] |
+| Tokens por corrida (entrada + salida) | 4 546 | 13 182 | +8 636 |
+
+La cobertura efectiva es la proporción de los tipos de recurso esperados del escenario que aparecen en el plan, y vale 0 cuando la corrida no llega a un plan válido. Los intervalos se obtienen por bootstrap remuestreando escenarios (B = 10 000, semilla 20261105).
+
+T0 superó `validate` y `plan` en 35 de las 36 corridas. Su única falla fue una referencia a un recurso no declarado en AVA-02 (`google_service_account.processor_sa_email`), detectada por `terraform validate`. T1 superó ambos controles en las 36 corridas. La diferencia en las tasas de éxito es de una sola corrida, mientras que T1 tardó en promedio 23 s más y costó el doble por corrida, porque analiza el requerimiento antes de generar, incluye el esquema del proveedor en el contexto y, cuando hace falta, repara.
 
 ---
 
-### 5.2 ANÁLISIS ESTADÍSTICO INFERENCIAL: PRUEBA DE WILCOXON
+### 5.3 RESULTADOS POR NIVEL DE COMPLEJIDAD
 
-Dado que las distribuciones de errores y coberturas no cumplen el supuesto de normalidad (evaluado mediante la prueba de Shapiro-Wilk, $p < 0.01$), se aplicó la prueba no paramétrica de rangos con signo de Wilcoxon para muestras pareadas sobre cada uno de los 12 escenarios de evaluación.
+#### Tabla 5.3: Resultados por nivel (promedio de los escenarios de cada nivel)
+| Nivel | Escenarios | $S_v$ T0 | $S_v$ T1 | $S_p$ T0 | $S_p$ T1 | Cobertura T0 | Cobertura T1 | Checkov T0 | Checkov T1 |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Básico | 4 | 100.0 % | 100.0 % | 100.0 % | 100.0 % | 85.4 % | 100.0 % | 1.33 | 1.25 |
+| Intermedio | 5 | 100.0 % | 100.0 % | 100.0 % | 100.0 % | 92.7 % | 100.0 % | 9.87 | 9.40 |
+| Avanzado | 3 | 88.9 % | 100.0 % | 88.9 % | 100.0 % | 85.8 % | 100.0 % | 15.56 | 19.56 |
 
-#### Tabla 5.2: Prueba de Rangos con Signo de Wilcoxon por Escenario (T1 frente a T0)
-| Escenario | Nivel | Mediana Defectos T0 | Mediana Defectos T1 | Estadístico $W$ | Valor $p$ | Decisión ($\alpha = 0.05$) |
-| :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **BAS-01** | Básico | 0.0 | 0.0 | 0.0 | 1.0000 | No rechazar $H_0$ (techo) |
-| **BAS-02** | Básico | 1.0 | 0.0 | 0.0 | 0.0384 | Rechazar $H_0$ ($T1 > T0$) |
-| **BAS-03** | Básico | 1.0 | 0.0 | 0.0 | 0.0412 | Rechazar $H_0$ ($T1 > T0$) |
-| **BAS-04** | Básico | 0.0 | 0.0 | 0.0 | 1.0000 | No rechazar $H_0$ (techo) |
-| **INT-01** | Intermedio | 3.0 | 0.0 | 0.0 | 0.0028 | Rechazar $H_0$ ($T1 > T0$) |
-| **INT-02** | Intermedio | 2.0 | 0.0 | 0.0 | 0.0075 | Rechazar $H_0$ ($T1 > T0$) |
-| **INT-03** | Intermedio | 2.0 | 0.0 | 0.0 | 0.0061 | Rechazar $H_0$ ($T1 > T0$) |
-| **INT-04** | Intermedio | 3.0 | 0.0 | 0.0 | 0.0034 | Rechazar $H_0$ ($T1 > T0$) |
-| **INT-05** | Intermedio | 3.0 | 0.0 | 0.0 | 0.0039 | Rechazar $H_0$ ($T1 > T0$) |
-| **AVA-01** | Avanzado | 5.0 | 0.0 | 0.0 | 0.0008 | Rechazar $H_0$ ($T1 > T0$) |
-| **AVA-02** | Avanzado | 4.0 | 0.0 | 0.0 | 0.0012 | Rechazar $H_0$ ($T1 > T0$) |
-| **AVA-03** | Avanzado | 6.0 | 1.0 | 1.5 | 0.0019 | Rechazar $H_0$ ($T1 > T0$) |
-| **GLOBAL** | **Todos** | **2.5** | **0.0** | **18.5** | **< 0.0001** | **Rechazo Contundente de $H_0$** |
+Las tasas de éxito solo difieren en el nivel avanzado, por la falla de T0 en AVA-02. La diferencia más consistente entre tratamientos está en la cobertura: T0 no alcanzó la cobertura completa en 6 de los 12 escenarios (BAS-02, BAS-04, INT-02, INT-04, AVA-02 y AVA-03) porque omitió alguno de los tipos de recurso esperados; en AVA-02 influye además la corrida que no llegó a un plan válido. T1 incluyó todos los tipos esperados en las 36 corridas. Los hallazgos de Checkov crecen con la complejidad en ambos tratamientos y no muestran una diferencia sistemática entre ellos.
 
 ---
 
-### 5.3 ANÁLISIS DE SIGNIFICANCIA DE ÉXITO EN VALIDACIÓN: PRUEBA DE MCNEMAR
+### 5.4 CONTRASTE DE HIPÓTESIS
 
-Para evaluar la proporción dicotómica de éxito/fracaso en pares apareados de escenarios idénticos bajo ambos tratamientos, se construyó la matriz de contingencia de McNemar (Tabla 5.3).
+#### Tabla 5.4: Wilcoxon de rangos con signo, pareado por escenario (T1 frente a T0)
+Cada escenario aporta un par con el promedio de sus tres repeticiones en cada tratamiento; los pares con diferencia cero se descartan. Se reporta el p bilateral exacto y el p ajustado por Holm sobre las métricas de la tabla.
 
-#### Tabla 5.3: Tabla de Contingencia 2x2 para la Prueba de McNemar
-| Condición | T1: Éxito (Pasa Validación) | T1: Fracaso (Falla Validación) | Total T0 |
-| :--- | :---: | :---: | :---: |
-| **T0: Éxito** | 14 (Concordancia positiva) | 0 (Discordancia desfavorable a T1) | 14 |
-| **T0: Fracaso** | 19 (Discordancia favorable a T1) | 3 (Concordancia negativa) | 22 |
-| **Total T1** | **33** | **3** | **36 Pares** |
+| Métrica | Pares ≠ 0 | Mediana Δ (T1 − T0) | W+ | W− | p | p Holm | r biserial |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Éxito de validación ($S_v$) | 1 | 0.000 | 1.0 | 0.0 | 1.0000 | 1.0000 | 1.00 |
+| Éxito de plan ($S_p$) | 1 | 0.000 | 1.0 | 0.0 | 1.0000 | 1.0000 | 1.00 |
+| Cobertura efectiva | 6 | 0.033 | 21.0 | 0.0 | 0.0312 | 0.1562 | 1.00 |
+| Hallazgos de Checkov | 7 | 0.000 | 15.5 | 12.5 | 0.8281 | 1.0000 | 0.11 |
+| Reparaciones ($N_i$) | 5 | 0.000 | 15.0 | 0.0 | 0.0625 | 0.2500 | 1.00 |
+| Tiempo ($T_e$) | 12 | 17.457 s | 77.0 | 1.0 | 0.0010 | 0.0068 | 0.97 |
+| Costo ($C_i$) | 12 | 0.012 USD | 76.0 | 2.0 | 0.0015 | 0.0088 | 0.95 |
+| Tokens | 12 | 7 194 | 78.0 | 0.0 | 0.0005 | 0.0039 | 1.00 |
 
-- **Estadístico de McNemar con corrección de continuidad de Edwards:**
-  $$\chi^2 = \frac{(|b - c| - 1)^2}{b + c} = \frac{(|19 - 0| - 1)^2}{19 + 0} = \frac{18^2}{19} = \frac{324}{19} \approx 17.05$$
-- **Grados de libertad:** $df = 1$.
-- **Valor $p$ asociado:** $p = 3.64 \times 10^{-5}$ ($p < 0.001$).
-- **Interpretación:** Existe una ganancia asimétrica altamente significativa a favor del tratamiento T1; 19 corridas que fallaron sistemáticamente en T0 fueron reparadas con éxito en T1, mientras que ninguna corrida exitosa en T0 se degradó en T1.
+#### Tabla 5.5: McNemar sobre los 36 pares T0/T1 de la misma repetición
+| Control | T0 éxito y T1 éxito | T0 éxito y T1 fracaso (b) | T0 fracaso y T1 éxito (c) | T0 fracaso y T1 fracaso | p exacto |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| `validate` ($S_v$) | 35 | 0 | 1 | 0 | 1.0000 |
+| `plan` ($S_p$) | 35 | 0 | 1 | 0 | 1.0000 |
+
+#### Tabla 5.6: Decisión sobre la hipótesis ($\alpha = 0.05$)
+| Aspecto evaluado | Evidencia | Decisión |
+| :--- | :--- | :--- |
+| Tasa de éxito de validación y de plan (hipótesis general $H_1$) | McNemar p = 1.000 y Wilcoxon p = 1.000; el IC 95 % de la diferencia incluye 0 | No se rechaza $H_0$ |
+| Reducción de defectos en más de 70 % | T0 tuvo un solo defecto en 36 corridas, de modo que la reducción no es estimable con precisión | No se puede evaluar |
+| Cobertura de los recursos esperados | IC 95 % de la diferencia [4.2 %, 19.4 %], que excluye 0; Wilcoxon p = 0.031 sin ajuste y p = 0.156 con Holm | Indicio a favor de T1, no significativo con corrección |
+| Hallazgos de seguridad (Checkov) | p = 0.828; IC 95 % [−0.33, 2.28] | Sin diferencia |
+| Tiempo y costo | p Holm = 0.007 y 0.009; T1 tarda más y cuesta más en 11 de los 12 escenarios | T1 tarda y cuesta más, de forma significativa |
+
+Con el modelo y los escenarios evaluados, la generación en un solo paso (T0) ya produce código que supera `validate` y `plan` en el 97.2 % de las corridas, lo que deja muy poco margen para que el bucle de reparación mejore esas tasas (efecto techo). El aporte medible de T1 se concentra en la cobertura de los recursos pedidos, y su costo es el doble de tiempo de agente y de gasto en tokens.
 
 ---
 
-### 5.4 INTERVALOS DE CONFIANZA AL 95 % MEDIANTE BOOTSTRAP
+### 5.5 ERRORES Y REPARACIÓN
 
-Se estimaron los intervalos de confianza del 95 % (IC 95 %) para las métricas principales mediante re-muestreo bootstrap no paramétrico con $B = 10\,000$ iteraciones (Tabla 5.4).
+En T0 se registró un solo error: la referencia a un recurso no declarado en AVA-02, detectada por `validate`. En T1, 9 de las 36 corridas necesitaron una reparación ($N_i$ media de 0.25) y todas convergieron en el primer intento de reparación; ninguna llegó al máximo de cinco reparaciones.
 
-#### Tabla 5.4: Estimación de Intervalos de Confianza al 95 % (Bootstrap B = 10,000)
-| Métrica | Tratamiento T0 [IC 95 %] | Tratamiento T1 [IC 95 %] | Diferencia $\Delta (T1 - T0)$ [IC 95 %] |
-| :--- | :---: | :---: | :---: |
-| **Tasa de Éxito Global ($S_v$)** | [23.1 %, 55.6 %] | [80.6 %, 97.2 %] | **[+33.3 %, +69.4 %]** |
-| **Cobertura de Recursos (%)** | [64.2 %, 78.3 %] | [96.1 %, 100.0 %] | **[+20.4 %, +33.8 %]** |
-| **Defectos de Seguridad (Checkov)** | [1.82, 3.45] fallas/run | [0.00, 0.28] fallas/run | **[-3.21, -1.65] fallas/run** |
-| **Tiempo de Ejecución (s)** | [18.2 s, 26.8 s] | [54.3 s, 83.1 s] | [+32.5 s, +59.8 s] |
-| **Costo por Corrida (USD)** | [$0.0034, $0.0051] | [$0.0078, $0.0121] | [+$0.0039, +$0.0076] |
+#### Tabla 5.7: Errores del primer intento de T1 y resultado de la reparación
+| Tipo de error | Control que lo detectó | Corridas | Resultado tras la reparación |
+| :--- | :--- | :---: | :--- |
+| Variable sensible con valor por defecto (contraseña o clave escrita en el código) | Revisión estática (`guard`) | 7 | Se quitó el valor por defecto y la corrida superó todos los controles |
+| Argumento inexistente `require_ssl` en `google_sql_database_instance` | `validate` | 2 | Se corrigió el argumento y la corrida superó todos los controles |
 
----
+En su primer intento, T1 escribió valores por defecto en variables sensibles en 7 corridas, y T0 en ninguna. Una explicación posible, que este experimento no permite confirmar, es que el prompt de generación de T1 indica usar los valores del contexto como valores por defecto de las variables (`agent/prompts/generar.md`). Sin la regla agregada tras el piloto, esas corridas habrían terminado con secretos en el código, como ocurrió en el piloto.
 
-### 5.5 DINÁMICA DE CONVERGENCIA Y REPARACIÓN ITERATIVA
-
-La Tabla 5.5 desglosa la distribución de intentos requeridos por el agente T1 para alcanzar la aprobación de los controles y los tipos de fallos resueltos en cada etapa.
-
-#### Tabla 5.5: Dinámica de Intentos y Tipos de Errores Resueltos en T1
-| Intento de Resolución | Corridas Resueltas Acumuladas | % Acumulado | Principales Tipos de Errores Subsanados |
-| :---: | :---: | :---: | :--- |
-| **Intento 1 (Generación Directa)** | 14 / 36 | 38.9 % | Escenarios básicos sin interdependencias complejas. |
-| **Intento 2 (1.ª Reparación)** | 30 / 36 | 83.3 % | Atributos en desuso en Cloud Run v2 (`port` $\to$ `ports { container_port }`), omission de `deletion_protection`, `uniform_bucket_level_access`. |
-| **Intento 3 (2.ª Reparación)** | 33 / 36 | 91.7 % | Dependencias cruzadas de VPC Peering hacia Cloud SQL (`depends_on`), secretos de Secret Manager inyectados como referencias y no texto plano. |
-| **Fallidos tras 3 Reintentos** | 3 / 36 | 8.3 % | Casos avanzados (AVA-03) con agotamiento del límite de tokens en topologías masivas multicapa. |
+#### Tabla 5.8: Comparación entre el piloto y el experimento
+| Lote | Código | $S_p$ T0 | $S_p$ T1 | Fallos de T0 por variable sin valor | Corridas de T1 que terminaron con secretos en el código |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| `lote-v1` (piloto) | `v1.0-piloto` | 33.3 % (12/36) | 100.0 % (36/36) | 23 | 24 |
+| `lote-v2` (experimento) | `v1.1-experimento` | 97.2 % (35/36) | 100.0 % (36/36) | 0 | 0 |
 
 ---
 
@@ -421,9 +446,9 @@ graph LR
 - **Trazabilidad:** Código `.tf`, salidas de consola y logs completos preservados en `docs/evidencia_despliegue/REAL-01/T1-e7f2b1c409a8/evidencia/` y en el Anexo B.
 
 #### 5.6.3 Desglose de Facturación y Costos de Infraestructura en GCP
-La Tabla 5.6 resume el consumo económico real generado durante la sesión de despliegue y validación del caso real en Google Cloud Platform.
+La Tabla 5.9 resume el consumo económico real generado durante la sesión de despliegue y validación del caso real en Google Cloud Platform.
 
-#### Tabla 5.6: Desglose de Costos de Infraestructura y LLM para el Caso Real (REAL-01)
+#### Tabla 5.9: Desglose de Costos de Infraestructura y LLM para el Caso Real (REAL-01)
 | Servicio de GCP / Componente | Dimensionamiento / Recursos | Tarifa Estimada Oficial GCP | Costo Facturado Sesión (~45 min) |
 | :--- | :--- | :---: | :---: |
 | **Cloud Run v2 (API y Web)** | 2 servicios (máx. 1 instancia por servicio) | $0.000048 USD/hora | $0.000036 USD |
@@ -434,7 +459,7 @@ La Tabla 5.6 resume el consumo económico real generado durante la sesión de de
 | **Gemini 3.8 Flash (LLM)** | Inferencia (analizar, generar y 1 reparación) | $0.075 / 1M in, $0.30 / 1M out | $0.013200 USD |
 | **TOTAL FACTURADO SESIÓN** | **Infraestructura Completa + Inferencia IA** | — | **$0.024681 USD** |
 
-> **Nota sobre facturación:** La consola de Google Cloud Billing reporta el consumo de Cloud SQL con un rezago estándar de entre 4 y 8 horas. El valor reportado en la Tabla 5.6 combina el registro de telemetría de APIs consumidas con el cálculo exacto de la tarifa por segundo prorrateada de Google Cloud para la región de Santiago (`southamerica-west1`).
+> **Nota sobre facturación:** La consola de Google Cloud Billing reporta el consumo de Cloud SQL con un rezago estándar de entre 4 y 8 horas. El valor reportado en la Tabla 5.9 combina el registro de telemetría de APIs consumidas con el cálculo exacto de la tarifa por segundo prorrateada de Google Cloud para la región de Santiago (`southamerica-west1`).
 
 ---
 
@@ -447,7 +472,7 @@ Para la monetización del tiempo humano se establecieron dos fuentes de referenc
 - **Referencia [18] (Indeed & Salary.com Cloud Contractor Rates 2025–2026):** Salario promedio y contratación por horas para ingenieros de infraestructura en Norteamérica y mercado global remoto: $45.00 – $65.00 USD/h (mediana de referencia: $50.00 USD/h).
 - **Tarifa base adoptada para el análisis:** **$55.00 USD/h** (promedio combinado de ambas fuentes de mercado).
 
-#### Tabla 5.7: Comparativa de Tiempos y Costos: Elaboración Manual frente al Agente T1
+#### Tabla 5.10: Comparativa de Tiempos y Costos: Elaboración Manual frente al Agente T1
 | Escenario Evaluado | Nivel | Recursos | Tiempo Manual Cronometrado | Tiempo Agente T1 | Reducción de Tiempo (%) | Costo Humano ($55/h) | Costo Inferencia T1 (LLM) | Ahorro Económico (%) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **BAS-01** | Básico | 2 | 24 min 30 s (1,470 s) | 38.2 s | **97.4 %** | $22.46 USD | $0.0034 USD | **99.98 %** |
@@ -464,15 +489,15 @@ xychart-beta
     line [38, 85, 162]
 ```
 
-La Tabla 5.7 evidencia que el agente IaC autónomo proporciona una **aceleración de más de 41 veces** en el tiempo de entrega y reduce el costo de autoría en **más del 99.98 %**. El Anexo D presenta la transcripción íntegra del código HCL escrito a mano, el detalle de errores sintácticos cometidos por el operador humano y la bitácora de iteraciones.
+La Tabla 5.10 evidencia que el agente IaC autónomo proporciona una **aceleración de más de 41 veces** en el tiempo de entrega y reduce el costo de autoría en **más del 99.98 %**. El Anexo D presenta la transcripción íntegra del código HCL escrito a mano, el detalle de errores sintácticos cometidos por el operador humano y la bitácora de iteraciones.
 
 ---
 
 ### 5.8 EVALUACIÓN DE SEGURIDAD DEL SANDBOX: PRUEBAS S1 A S8
 
-La contención del entorno de ejecución se evaluó con 8 pruebas de seguridad (S1 a S8). Siete están automatizadas en pytest y se ejecutan dentro del contenedor del sandbox con Terraform, TFLint y Checkov reales (`docker compose run --rm pruebas`): las 110 pruebas de la suite pasaron sobre el código congelado. S6 cuenta además con un script de evidencia de 10 comprobaciones, y S5 requiere las credenciales del proyecto. La Tabla 5.8 resume el resultado y el mecanismo de cada control; la evidencia está en `docs/evidencia_seguridad/`.
+La contención del entorno de ejecución se evaluó con 8 pruebas de seguridad (S1 a S8). Siete están automatizadas en pytest y se ejecutan dentro del contenedor del sandbox con Terraform, TFLint y Checkov reales (`docker compose run --rm pruebas`): las 110 pruebas de la suite pasaron sobre el código congelado. S6 cuenta además con un script de evidencia de 10 comprobaciones, y S5 requiere las credenciales del proyecto. La Tabla 5.11 resume el resultado y el mecanismo de cada control; la evidencia está en `docs/evidencia_seguridad/`.
 
-#### Tabla 5.8: Resultados de la Batería de Pruebas de Seguridad del Sandbox (S1 a S8)
+#### Tabla 5.11: Resultados de la Batería de Pruebas de Seguridad del Sandbox (S1 a S8)
 | ID Control | Propósito y Amenaza Mitigada | Mecanismo de Defensa Implementado | Resultado de Prueba | Evidencia Asociada |
 | :---: | :--- | :--- | :---: | :--- |
 | **S1** | El modo evaluación no aplica ni destruye infraestructura. | El ejecutor del modo evaluación (`sandbox/local_runner.py`) solo admite `init`, `fmt`, `validate`, `plan`, `show` y `version`; `apply`, `destroy`, `import` y `state` se rechazan con `ComandoNoPermitido`. Además, `plan` corre con la cuenta Viewer. | **PASÓ (1 prueba)** | `test_sandbox.py::test_ejecutor_de_evaluacion_no_permite_apply`; `pytest-contenedor.txt` |
@@ -492,9 +517,9 @@ S5 queda pendiente porque las credenciales del proyecto las administra un solo i
 
 ### 6.1 DISCUSIÓN DE HALLAZGOS
 
-Los resultados empíricos obtenidos en las 72 corridas experimentales y en el despliegue del caso real confirman que la generación de Infraestructura como Código mediante LLMs no puede tratarse como un problema de texto libre de un solo paso. La complejidad inherente de los grafos de dependencias en Terraform, las restricciones implícitas de seguridad y las actualizaciones constantes de los esquemas de nube demandan un enfoque agéntico basado en herramientas formales.
+Los resultados del experimento no confirman que el bucle de validación y reparación aumente la tasa de código válido con el modelo evaluado. Gemini 3.8 Flash, con las reglas base del proyecto y en una sola llamada, produjo código que superó `validate` y `plan` en 35 de las 36 corridas de T0; el único defecto fue una referencia a un recurso no declarado. Con tasas tan altas en la línea base, el bucle de T1 tiene poco margen para mejorar el éxito de validación, y la diferencia observada, de una sola corrida, no es significativa.
 
-La comparación entre T0 y T1 ilustra con claridad que el conocimiento paramétrico del LLM es insuficiente para producir código libre de errores en topologías intermedias y avanzadas. En T0, más del 61 % de los intentos fallaron debido a sutiles inconsistencias sintácticas (por ejemplo, omitir bloques de anidación o utilizar identificadores obsoletos de versiones anteriores del proveedor Google). En contraste, el bucle de reparación de T1 permitió que el modelo recibiera los diagnósticos exactos emitidos por el compilador y los analizadores estáticos, guiando una convergencia correctiva en menos de dos reintentos.
+El aporte medible de T1 está en la completitud del código y en el cumplimiento de reglas que el modelo no respeta por sí solo. T1 incluyó todos los tipos de recurso esperados en las 36 corridas, mientras que T0 no alcanzó la cobertura completa en 6 de los 12 escenarios. El piloto mostró además un riesgo propio de los agentes que se reparan guiados por un validador: cuando el control fallaba por falta de valores, el bucle lo superó escribiendo contraseñas en el código. La regla agregada a la revisión estática corrigió ese comportamiento en el experimento, donde 7 corridas se repararon por esa causa, lo que indica que los controles deben cubrir también las reglas de seguridad que establece el propio prompt y no solo la validez del código. Estos beneficios tienen un costo: T1 tarda en promedio 23 s más y gasta el doble por corrida, aunque el costo absoluto se mantiene por debajo de 0.04 USD.
 
 ---
 
@@ -504,10 +529,10 @@ La comparación entre T0 y T1 ilustra con claridad que el conocimiento paramétr
 La arquitectura de contención por capas (revisión estructural del HCL con `guard.py` antes de `init`, espejo local de proveedores, red interna de Docker sin salida directa a internet, proxy Squid con lista blanca de dominios de Google Cloud, contenedores de solo lectura sin privilegios y suplantación de la cuenta Viewer) superó las pruebas automatizadas S1 a S4 y S6 a S8: el código generado no pudo usar otros proveedores, ejecutar comandos locales, leer archivos o credenciales del sandbox, salir a internet ni desplegar sin aprobación humana. Las capas se complementan: si la revisión estática dejara pasar un caso, el espejo de proveedores y la red siguen bloqueándolo. S5 (permisos de la cuenta Viewer) queda pendiente de evidencia. Persisten riesgos residuales: la credencial del operador se monta en el contenedor, las APIs de Google permitidas podrían usarse como canal de salida de datos y la revisión estática puede tener falsos negativos.
 
 #### Conclusión C2: Efectividad del Grounding y el Bucle T1 (Gabriel Llerena)
-La combinación de un catálogo de recursos curado junto con el índice del esquema real del proveedor `google` y el ciclo de retroalimentación de herramientas formales incrementó la tasa de éxito de validación del **38.9 % en T0 al 91.7 % en T1**, alcanzando un $100 \%$ de éxito en escenarios básicos y un $93.3 \%$ en intermedios. Las pruebas de significancia estadística de McNemar ($p = 3.64 \times 10^{-5}$) y Wilcoxon ($p < 0.0001$) confirman el rechazo categórico de la hipótesis nula, evidenciando que el bucle formal de reparación es determinante para transformar borradores alucinados en manifiestos de infraestructura completamente válidos.
+Con el modelo evaluado, el grounding y el bucle de validación de T1 no aumentaron de forma significativa la tasa de éxito de validación ni la de plan: T0 alcanzó 97.2 % y T1 100 % en ambos controles (McNemar exacto, $p = 1.0$; Wilcoxon por escenario, $p = 1.0$). Por lo tanto, no se rechaza la hipótesis nula. T1 sí incluyó todos los tipos de recurso esperados (cobertura de 100 % frente a 88.5 %, con un IC 95 % de la diferencia de [4.2 %, 19.4 %]), aunque esa diferencia deja de ser significativa tras la corrección de Holm ($p = 0.156$). Los hallazgos de Checkov no difieren entre tratamientos ($p = 0.83$).
 
 #### Conclusión C3: Reducción Sistemática de Defectos y Dinámica de Convergencia (Gabriel Llerena)
-El análisis de iteraciones reveló que el agente autónomo resuelve la vasta mayoría de errores (el 86.4 % de los casos que fallaron inicialmente) en la primera ronda de retroalimentación (intento 2), y el 91.7 % al segundo reintento. Esto demuestra que los diagnósticos estructurados proporcionados al prompt de reparación permiten al modelo corregir el defecto puntual sin degradar componentes arquitectónicos previamente válidos, evitando bucles infinitos de alucinación y manteniendo la estabilidad del código HCL.
+El bucle de reparación intervino en 9 de las 36 corridas de T1, y todas convergieron en la primera reparación: 7 por variables sensibles con valor por defecto, rechazadas por la revisión estática, y 2 por un argumento inexistente detectado por `validate`. El piloto mostró que, cuando el entorno de validación tiene un defecto, el bucle puede superar el control a costa de una regla de seguridad (24 corridas terminaron con contraseñas en el código), por lo que el diseño de los controles resulta tan importante como el ciclo de reparación. El costo del ciclo es significativo en términos relativos (23 s y 0.016 USD adicionales por corrida, con $p < 0.01$ tras el ajuste de Holm), pero pequeño en términos absolutos.
 
 #### Conclusión C4: Viabilidad Económica, Eficiencia Temporal y Transferibilidad a Producción (Paolo Ramírez)
 La contrastación empírica entre la medición manual cronometrada y el agente autónomo comprobó que el agente reduce el tiempo de desarrollo de infraestructura en un **97.5 %** (de horas a escasos minutos) y disminuye los costos directos de elaboración en un **99.98 %**, requiriendo menos de tres centavos de dólar ($0.027 USD) en cómputo de IA frente a más de $179 USD en valor de horas de consultoría especializada. Además, el despliegue exitoso en Google Cloud Platform de la aplicación *Picantería Digital* (API NestJS, Web Nginx, PostgreSQL 17 y Secret Manager en `southamerica-west1`) valida la capacidad del agente para transferir de manera segura y precisa requerimientos complejos hacia entornos productivos reales bajo supervisión humana estricta.
@@ -518,6 +543,9 @@ La contrastación empírica entre la medición manual cronometrada y el agente a
 1. **Catálogo acotado de servicios:** El estudio se concentró en 6 servicios troncales de Google Cloud Platform (`cloud_run`, `cloud_sql_postgres`, `cloud_storage`, `vpc`, `secret_manager` e `iam`). Servicios no contemplados en el catálogo curado (como Cloud KMS, Cloud Pub/Sub, Kubernetes Engine GKE o Dataflow) no formaron parte del alcance del experimento y son rechazados por diseño en los controles de seguridad estática y validación de tipos.
 2. **Evaluación centrada en un único proveedor:** El agente fue optimizado para Google Cloud Platform (`hashicorp/google`). La generalización hacia Amazon Web Services (AWS) o Microsoft Azure requiere adaptar los esquemas y reglas de linters correspondientes.
 3. **Dependencia de la disponibilidad de APIs:** La fase de `terraform plan` requiere conectividad con las APIs públicas de Google Cloud y una cuenta con rol Viewer activa, lo que introduce una dependencia externa en la fase final de verificación.
+4. **Efecto techo en la línea base:** Con el modelo evaluado, T0 supera `validate` y `plan` en el 97.2 % de las corridas, lo que limita la capacidad del experimento para detectar diferencias en esas tasas. Escenarios más exigentes o un modelo menos capaz podrían mostrar una relación distinta.
+5. **Valores de relleno en `plan`:** En modo evaluación, las variables sin valor por defecto reciben un valor de relleno. El plan verifica la estructura del código y sus referencias, pero no que los valores reales que se usarán al desplegar sean válidos para cada servicio.
+6. **Tamaño de la muestra:** Doce escenarios con tres repeticiones por tratamiento permiten detectar diferencias grandes, pero no efectos pequeños, como la diferencia de cobertura observada.
 
 ---
 
@@ -738,14 +766,16 @@ Todos los archivos manuales fueron verificados con `sandbox/guard.py` superando 
 
 - **Repositorio Público de GitHub:** [https://github.com/pieroMejiaR/LLM-IAC-GCP](https://github.com/pieroMejiaR/LLM-IAC-GCP)
 - **Repositorio de la Aplicación Caso Real:** [https://github.com/gllerenamo/picanteria-digital](https://github.com/gllerenamo/picanteria-digital)
-- **Etiqueta de Congelamiento Experimental:** `v1.0-experimento` (Commit base `4a78d23`)
+- **Etiqueta de Congelamiento Experimental:** `v1.1-experimento` (commit `0bc4930`), código con el que se ejecutó el experimento (`lote-v2`).
+- **Etiqueta del Piloto:** `v1.0-piloto` (commit `4a78d23`), código del lote piloto (`lote-v1`) descrito en la sección 5.1.
+- **Datos y análisis:** `docs/experimento/lote-v2/` (experimento) y `docs/experimento/lote-v1/` (piloto).
 
 ### Pasos de Reproducción Rápida:
 ```bash
 # 1. Clonar el repositorio y acceder a la etiqueta del experimento
 git clone https://github.com/pieroMejiaR/LLM-IAC-GCP.git
 cd LLM-IAC-GCP
-git checkout v1.0-experimento
+git checkout v1.1-experimento
 
 # 2. Configurar credenciales y variables de entorno
 cp .env.example .env
@@ -761,8 +791,9 @@ docker compose run --rm --entrypoint python agente -m sandbox.pruebas_seguridad 
 # 5. Ejecutar la batería de pruebas unitarias y de seguridad (S1 a S8)
 docker compose run --rm pruebas
 
-# 6. Ejecutar el lote experimental completo (72 corridas)
-docker compose run --rm --entrypoint python agente -m eval.run_batch
+# 6. Ejecutar el lote experimental completo (72 corridas) y su análisis estadístico
+docker compose run --rm --entrypoint python agente -m eval.run_batch --salida resultados/lote-v2
+docker compose run --rm --entrypoint python agente -m eval.analysis resultados/lote-v2/runs.csv
 
 # 7. Lanzar la interfaz web interactiva
 docker compose up -d web-puente

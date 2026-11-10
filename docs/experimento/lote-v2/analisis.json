@@ -1,0 +1,820 @@
+{
+  "corridas": 72,
+  "excluidas_entorno": [],
+  "filas_duplicadas": 0,
+  "bootstrap": {
+    "b": 10000,
+    "semilla": 20261105
+  },
+  "global": {
+    "exito_validacion": {
+      "T0": {
+        "media": 0.9722222222222222,
+        "suma": 35.0,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 1.0,
+            "suma": 12.0,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 1.0,
+            "suma": 15.0,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 0.8888888888888888,
+            "suma": 8.0,
+            "n": 9
+          }
+        }
+      },
+      "T1": {
+        "media": 1.0,
+        "suma": 36.0,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 1.0,
+            "suma": 12.0,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 1.0,
+            "suma": 15.0,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 1.0,
+            "suma": 9.0,
+            "n": 9
+          }
+        }
+      }
+    },
+    "exito_plan": {
+      "T0": {
+        "media": 0.9722222222222222,
+        "suma": 35.0,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 1.0,
+            "suma": 12.0,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 1.0,
+            "suma": 15.0,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 0.8888888888888888,
+            "suma": 8.0,
+            "n": 9
+          }
+        }
+      },
+      "T1": {
+        "media": 1.0,
+        "suma": 36.0,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 1.0,
+            "suma": 12.0,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 1.0,
+            "suma": 15.0,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 1.0,
+            "suma": 9.0,
+            "n": 9
+          }
+        }
+      }
+    },
+    "cobertura": {
+      "T0": {
+        "media": 0.8853638888888888,
+        "suma": 31.8731,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 0.854175,
+            "suma": 10.2501,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 0.92666,
+            "suma": 13.8999,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 0.8581222222222222,
+            "suma": 7.7231000000000005,
+            "n": 9
+          }
+        }
+      },
+      "T1": {
+        "media": 1.0,
+        "suma": 36.0,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 1.0,
+            "suma": 12.0,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 1.0,
+            "suma": 15.0,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 1.0,
+            "suma": 9.0,
+            "n": 9
+          }
+        }
+      }
+    },
+    "checkov_fallidas": {
+      "T0": {
+        "media": 8.444444444444445,
+        "suma": 304.0,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 1.3333333333333333,
+            "suma": 16.0,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 9.866666666666667,
+            "suma": 148.0,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 15.555555555555555,
+            "suma": 140.0,
+            "n": 9
+          }
+        }
+      },
+      "T1": {
+        "media": 9.222222222222221,
+        "suma": 332.0,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 1.25,
+            "suma": 15.0,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 9.4,
+            "suma": 141.0,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 19.555555555555557,
+            "suma": 176.0,
+            "n": 9
+          }
+        }
+      }
+    },
+    "intentos": {
+      "T0": {
+        "media": 0.0,
+        "suma": 0.0,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 0.0,
+            "suma": 0.0,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 0.0,
+            "suma": 0.0,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 0.0,
+            "suma": 0.0,
+            "n": 9
+          }
+        }
+      },
+      "T1": {
+        "media": 0.25,
+        "suma": 9.0,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 0.0,
+            "suma": 0.0,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 0.3333333333333333,
+            "suma": 5.0,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 0.4444444444444444,
+            "suma": 4.0,
+            "n": 9
+          }
+        }
+      }
+    },
+    "tiempo_s": {
+      "T0": {
+        "media": 36.79130555555555,
+        "suma": 1324.487,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 29.257166666666667,
+            "suma": 351.086,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 37.650733333333335,
+            "suma": 564.761,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 45.404444444444444,
+            "suma": 408.64,
+            "n": 9
+          }
+        }
+      },
+      "T1": {
+        "media": 59.912416666666665,
+        "suma": 2156.847,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 36.81825,
+            "suma": 441.819,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 58.461600000000004,
+            "suma": 876.924,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 93.12266666666666,
+            "suma": 838.104,
+            "n": 9
+          }
+        }
+      }
+    },
+    "costo_usd": {
+      "T0": {
+        "media": 0.015136027777777778,
+        "suma": 0.544897,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 0.011566833333333333,
+            "suma": 0.138802,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 0.0155864,
+            "suma": 0.233796,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 0.019144333333333333,
+            "suma": 0.172299,
+            "n": 9
+          }
+        }
+      },
+      "T1": {
+        "media": 0.03111127777777778,
+        "suma": 1.120006,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 0.015551833333333334,
+            "suma": 0.186622,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 0.030065133333333334,
+            "suma": 0.450977,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 0.053600777777777775,
+            "suma": 0.48240700000000003,
+            "n": 9
+          }
+        }
+      }
+    },
+    "tokens": {
+      "T0": {
+        "media": 4545.861111111111,
+        "suma": 163651.0,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 3545.0833333333335,
+            "suma": 42541.0,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 4669.0,
+            "suma": 70035.0,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 5675.0,
+            "suma": 51075.0,
+            "n": 9
+          }
+        }
+      },
+      "T1": {
+        "media": 13182.027777777777,
+        "suma": 474553.0,
+        "n": 36,
+        "por_nivel": {
+          "basico": {
+            "media": 6292.833333333333,
+            "suma": 75514.0,
+            "n": 12
+          },
+          "intermedio": {
+            "media": 12678.466666666667,
+            "suma": 190177.0,
+            "n": 15
+          },
+          "avanzado": {
+            "media": 23206.88888888889,
+            "suma": 208862.0,
+            "n": 9
+          }
+        }
+      }
+    }
+  },
+  "wilcoxon": {
+    "exito_validacion": {
+      "n": 1,
+      "ceros": 11,
+      "w_mas": 1.0,
+      "w_menos": 0,
+      "estadistico": 0,
+      "p": 1.0,
+      "metodo": "exacto",
+      "r_biserial": 1.0,
+      "mediana_dif": 0.0,
+      "escenarios": 12,
+      "p_holm": 1.0
+    },
+    "exito_plan": {
+      "n": 1,
+      "ceros": 11,
+      "w_mas": 1.0,
+      "w_menos": 0,
+      "estadistico": 0,
+      "p": 1.0,
+      "metodo": "exacto",
+      "r_biserial": 1.0,
+      "mediana_dif": 0.0,
+      "escenarios": 12,
+      "p_holm": 1.0
+    },
+    "cobertura": {
+      "n": 6,
+      "ceros": 6,
+      "w_mas": 21.0,
+      "w_menos": 0,
+      "estadistico": 0,
+      "p": 0.03125,
+      "metodo": "exacto",
+      "r_biserial": 1.0,
+      "mediana_dif": 0.033333333333333326,
+      "escenarios": 12,
+      "p_holm": 0.15625
+    },
+    "checkov_fallidas": {
+      "n": 7,
+      "ceros": 5,
+      "w_mas": 15.5,
+      "w_menos": 12.5,
+      "estadistico": 12.5,
+      "p": 0.828125,
+      "metodo": "exacto",
+      "r_biserial": 0.10714285714285714,
+      "mediana_dif": 0.0,
+      "escenarios": 12,
+      "p_holm": 1.0
+    },
+    "intentos": {
+      "n": 5,
+      "ceros": 7,
+      "w_mas": 15.0,
+      "w_menos": 0,
+      "estadistico": 0,
+      "p": 0.0625,
+      "metodo": "exacto",
+      "r_biserial": 1.0,
+      "mediana_dif": 0.0,
+      "escenarios": 12,
+      "p_holm": 0.25
+    },
+    "tiempo_s": {
+      "n": 12,
+      "ceros": 0,
+      "w_mas": 77.0,
+      "w_menos": 1.0,
+      "estadistico": 1.0,
+      "p": 0.0009765625,
+      "metodo": "exacto",
+      "r_biserial": 0.9743589743589743,
+      "mediana_dif": 17.45733333333333,
+      "escenarios": 12,
+      "p_holm": 0.0068359375
+    },
+    "costo_usd": {
+      "n": 12,
+      "ceros": 0,
+      "w_mas": 76.0,
+      "w_menos": 2.0,
+      "estadistico": 2.0,
+      "p": 0.00146484375,
+      "metodo": "exacto",
+      "r_biserial": 0.9487179487179487,
+      "mediana_dif": 0.012442333333333333,
+      "escenarios": 12,
+      "p_holm": 0.0087890625
+    },
+    "tokens": {
+      "n": 12,
+      "ceros": 0,
+      "w_mas": 78.0,
+      "w_menos": 0,
+      "estadistico": 0,
+      "p": 0.00048828125,
+      "metodo": "exacto",
+      "r_biserial": 1.0,
+      "mediana_dif": 7193.833333333333,
+      "escenarios": 12,
+      "p_holm": 0.00390625
+    }
+  },
+  "mcnemar": {
+    "exito_validacion": {
+      "a": 35,
+      "b": 0,
+      "c": 1,
+      "d": 0,
+      "p_exacto": 1.0,
+      "chi2": 0.0,
+      "p_chi2": 1.0
+    },
+    "exito_plan": {
+      "a": 35,
+      "b": 0,
+      "c": 1,
+      "d": 0,
+      "p_exacto": 1.0,
+      "chi2": 0.0,
+      "p_chi2": 1.0
+    }
+  },
+  "ic_bootstrap": {
+    "exito_validacion": {
+      "t0": 0.9722222222222222,
+      "t0_ic": [
+        0.9166666666666666,
+        1.0
+      ],
+      "t1": 1.0,
+      "t1_ic": [
+        1.0,
+        1.0
+      ],
+      "dif": 0.02777777777777779,
+      "dif_ic": [
+        0.0,
+        0.08333333333333337
+      ]
+    },
+    "exito_plan": {
+      "t0": 0.9722222222222222,
+      "t0_ic": [
+        0.9166666666666666,
+        1.0
+      ],
+      "t1": 1.0,
+      "t1_ic": [
+        1.0,
+        1.0
+      ],
+      "dif": 0.02777777777777779,
+      "dif_ic": [
+        0.0,
+        0.08333333333333337
+      ]
+    },
+    "cobertura": {
+      "t0": 0.8853638888888888,
+      "t0_ic": [
+        0.8060997916666667,
+        0.9583333333333334
+      ],
+      "t1": 1.0,
+      "t1_ic": [
+        1.0,
+        1.0
+      ],
+      "dif": 0.11463611111111116,
+      "dif_ic": [
+        0.04166666666666663,
+        0.1939002083333333
+      ]
+    },
+    "checkov_fallidas": {
+      "t0": 8.444444444444445,
+      "t0_ic": [
+        4.444444444444445,
+        12.416666666666666
+      ],
+      "t1": 9.222222222222221,
+      "t1_ic": [
+        4.611111111111111,
+        14.195138888888879
+      ],
+      "dif": 0.7777777777777768,
+      "dif_ic": [
+        -0.33333333333333304,
+        2.277777777777777
+      ]
+    },
+    "intentos": {
+      "t0": 0.0,
+      "t0_ic": [
+        0.0,
+        0.0
+      ],
+      "t1": 0.25,
+      "t1_ic": [
+        0.08333333333333333,
+        0.4444444444444444
+      ],
+      "dif": 0.25,
+      "dif_ic": [
+        0.08333333333333333,
+        0.4444444444444444
+      ]
+    },
+    "tiempo_s": {
+      "t0": 36.79130555555555,
+      "t0_ic": [
+        32.12074305555556,
+        41.74741041666666
+      ],
+      "t1": 59.912416666666665,
+      "t1_ic": [
+        46.38489791666667,
+        76.99057777777777
+      ],
+      "dif": 23.121111111111112,
+      "dif_ic": [
+        11.172670138888886,
+        39.216806250000005
+      ]
+    },
+    "costo_usd": {
+      "t0": 0.015136027777777778,
+      "t0_ic": [
+        0.012809486805555556,
+        0.017712798611111108
+      ],
+      "t1": 0.03111127777777778,
+      "t1_ic": [
+        0.022422634722222227,
+        0.04149970416666666
+      ],
+      "dif": 0.015975250000000003,
+      "dif_ic": [
+        0.008354176388888891,
+        0.025741936111111106
+      ]
+    }
+  },
+  "por_escenario": [
+    {
+      "escenario": "AVA-01",
+      "nivel": "avanzado",
+      "exito_validacion_T0": 1.0,
+      "exito_validacion_T1": 1.0,
+      "exito_plan_T0": 1.0,
+      "exito_plan_T1": 1.0,
+      "cobertura_T0": 1.0,
+      "cobertura_T1": 1.0,
+      "checkov_fallidas_T0": 15.0,
+      "checkov_fallidas_T1": 15.333333333333334,
+      "intentos_T0": 0.0,
+      "intentos_T1": 0.3333333333333333,
+      "corridas_T0": 3,
+      "corridas_T1": 3
+    },
+    {
+      "escenario": "AVA-02",
+      "nivel": "avanzado",
+      "exito_validacion_T0": 0.6666666666666666,
+      "exito_validacion_T1": 1.0,
+      "exito_plan_T0": 0.6666666666666666,
+      "exito_plan_T1": 1.0,
+      "cobertura_T0": 0.6410333333333333,
+      "cobertura_T1": 1.0,
+      "checkov_fallidas_T0": 10.0,
+      "checkov_fallidas_T1": 14.333333333333334,
+      "intentos_T0": 0.0,
+      "intentos_T1": 0.3333333333333333,
+      "corridas_T0": 3,
+      "corridas_T1": 3
+    },
+    {
+      "escenario": "AVA-03",
+      "nivel": "avanzado",
+      "exito_validacion_T0": 1.0,
+      "exito_validacion_T1": 1.0,
+      "exito_plan_T0": 1.0,
+      "exito_plan_T1": 1.0,
+      "cobertura_T0": 0.9333333333333333,
+      "cobertura_T1": 1.0,
+      "checkov_fallidas_T0": 21.666666666666668,
+      "checkov_fallidas_T1": 29.0,
+      "intentos_T0": 0.0,
+      "intentos_T1": 0.6666666666666666,
+      "corridas_T0": 3,
+      "corridas_T1": 3
+    },
+    {
+      "escenario": "BAS-01",
+      "nivel": "basico",
+      "exito_validacion_T0": 1.0,
+      "exito_validacion_T1": 1.0,
+      "exito_plan_T0": 1.0,
+      "exito_plan_T1": 1.0,
+      "cobertura_T0": 1.0,
+      "cobertura_T1": 1.0,
+      "checkov_fallidas_T0": 4.0,
+      "checkov_fallidas_T1": 4.0,
+      "intentos_T0": 0.0,
+      "intentos_T1": 0.0,
+      "corridas_T0": 3,
+      "corridas_T1": 3
+    },
+    {
+      "escenario": "BAS-02",
+      "nivel": "basico",
+      "exito_validacion_T0": 1.0,
+      "exito_validacion_T1": 1.0,
+      "exito_plan_T0": 1.0,
+      "exito_plan_T1": 1.0,
+      "cobertura_T0": 0.75,
+      "cobertura_T1": 1.0,
+      "checkov_fallidas_T0": 0.0,
+      "checkov_fallidas_T1": 0.0,
+      "intentos_T0": 0.0,
+      "intentos_T1": 0.0,
+      "corridas_T0": 3,
+      "corridas_T1": 3
+    },
+    {
+      "escenario": "BAS-03",
+      "nivel": "basico",
+      "exito_validacion_T0": 1.0,
+      "exito_validacion_T1": 1.0,
+      "exito_plan_T0": 1.0,
+      "exito_plan_T1": 1.0,
+      "cobertura_T0": 1.0,
+      "cobertura_T1": 1.0,
+      "checkov_fallidas_T0": 0.0,
+      "checkov_fallidas_T1": 0.0,
+      "intentos_T0": 0.0,
+      "intentos_T1": 0.0,
+      "corridas_T0": 3,
+      "corridas_T1": 3
+    },
+    {
+      "escenario": "BAS-04",
+      "nivel": "basico",
+      "exito_validacion_T0": 1.0,
+      "exito_validacion_T1": 1.0,
+      "exito_plan_T0": 1.0,
+      "exito_plan_T1": 1.0,
+      "cobertura_T0": 0.6667,
+      "cobertura_T1": 1.0,
+      "checkov_fallidas_T0": 1.3333333333333333,
+      "checkov_fallidas_T1": 1.0,
+      "intentos_T0": 0.0,
+      "intentos_T1": 0.0,
+      "corridas_T0": 3,
+      "corridas_T1": 3
+    },
+    {
+      "escenario": "INT-01",
+      "nivel": "intermedio",
+      "exito_validacion_T0": 1.0,
+      "exito_validacion_T1": 1.0,
+      "exito_plan_T0": 1.0,
+      "exito_plan_T1": 1.0,
+      "cobertura_T0": 1.0,
+      "cobertura_T1": 1.0,
+      "checkov_fallidas_T0": 14.333333333333334,
+      "checkov_fallidas_T1": 13.333333333333334,
+      "intentos_T0": 0.0,
+      "intentos_T1": 0.0,
+      "corridas_T0": 3,
+      "corridas_T1": 3
+    },
+    {
+      "escenario": "INT-02",
+      "nivel": "intermedio",
+      "exito_validacion_T0": 1.0,
+      "exito_validacion_T1": 1.0,
+      "exito_plan_T0": 1.0,
+      "exito_plan_T1": 1.0,
+      "cobertura_T0": 0.8,
+      "cobertura_T1": 1.0,
+      "checkov_fallidas_T0": 0.0,
+      "checkov_fallidas_T1": 0.0,
+      "intentos_T0": 0.0,
+      "intentos_T1": 1.0,
+      "corridas_T0": 3,
+      "corridas_T1": 3
+    },
+    {
+      "escenario": "INT-03",
+      "nivel": "intermedio",
+      "exito_validacion_T0": 1.0,
+      "exito_validacion_T1": 1.0,
+      "exito_plan_T0": 1.0,
+      "exito_plan_T1": 1.0,
+      "cobertura_T0": 1.0,
+      "cobertura_T1": 1.0,
+      "checkov_fallidas_T0": 14.333333333333334,
+      "checkov_fallidas_T1": 14.0,
+      "intentos_T0": 0.0,
+      "intentos_T1": 0.6666666666666666,
+      "corridas_T0": 3,
+      "corridas_T1": 3
+    },
+    {
+      "escenario": "INT-04",
+      "nivel": "intermedio",
+      "exito_validacion_T0": 1.0,
+      "exito_validacion_T1": 1.0,
+      "exito_plan_T0": 1.0,
+      "exito_plan_T1": 1.0,
+      "cobertura_T0": 0.8333,
+      "cobertura_T1": 1.0,
+      "checkov_fallidas_T0": 7.0,
+      "checkov_fallidas_T1": 6.0,
+      "intentos_T0": 0.0,
+      "intentos_T1": 0.0,
+      "corridas_T0": 3,
+      "corridas_T1": 3
+    },
+    {
+      "escenario": "INT-05",
+      "nivel": "intermedio",
+      "exito_validacion_T0": 1.0,
+      "exito_validacion_T1": 1.0,
+      "exito_plan_T0": 1.0,
+      "exito_plan_T1": 1.0,
+      "cobertura_T0": 1.0,
+      "cobertura_T1": 1.0,
+      "checkov_fallidas_T0": 13.666666666666666,
+      "checkov_fallidas_T1": 13.666666666666666,
+      "intentos_T0": 0.0,
+      "intentos_T1": 0.0,
+      "corridas_T0": 3,
+      "corridas_T1": 3
+    }
+  ]
+}
