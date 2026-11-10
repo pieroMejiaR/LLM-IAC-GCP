@@ -542,6 +542,13 @@ details.hallazgos summary span { font-weight: 400; color: var(--grafito-3); }
 .simple { padding: 14px 16px; background: var(--papel); border-left: 3px solid var(--grafito); }
 .simple .lista { margin: 8px 0; color: var(--grafito); }
 
+.oculto { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.adjunto { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.adjunto-nota { font-size: var(--t-2); color: var(--grafito-3); }
+.adjunto-nombre { font-size: var(--t-1); font-weight: 600; padding: 5px 10px; background: var(--paso-tenue); border-radius: 3px; }
+.boton.chico { padding: 6px 12px; font-size: var(--t-1); font-weight: 400; }
+.texto-plano.envuelto { white-space: pre-wrap; overflow-wrap: anywhere; }
+
 .publicar { padding: 14px 16px; background: var(--hoja); border: 1px solid var(--trazo); border-radius: 2px; }
 .publicar > * + * { margin-top: 10px; }
 .publicar .fila-texto { font-size: var(--t-1); color: var(--grafito-2); max-width: 72ch; }

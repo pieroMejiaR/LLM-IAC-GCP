@@ -49,37 +49,148 @@
   const despliegueAbierto = (s) => { const a = despliegueDe(s); return !!a && a.fase !== "terminado"; };
 
   function ejemplos() {
-    const i = estado.info;
-    if (!i || !i.despliegue || !i.proyecto) return EJEMPLOS;
-    const repo = i.repositorio || `southamerica-west1-docker.pkg.dev/${i.proyecto}/apps`;
     return [...EJEMPLOS, {
-      etiqueta: "Caso real: tengo en mi computadora el sistema de pedidos de mi picantería y quiero ponerlo en internet.",
-      // Primero, lo que diría el dueño del negocio; después, la ficha de la aplicación. Sin esa ficha
-      // el agente no sabe qué imagen usar ni cómo conectar la API con la base de datos.
-      texto: [
-        "Tengo una picantería y quiero poner en internet nuestro sistema de pedidos, para que los mozos y la cocina lo "
-          + "usen desde el celular. Lo tenemos en nuestra computadora y tiene dos partes: la página web y el programa que "
-          + "guarda los pedidos. Ya publiqué las dos con el paso «Publique su aplicación». También necesita una base de datos. "
-          + "Quiero que cueste lo menos posible y poder borrarlo todo cuando terminemos de probar. Estamos en Arequipa; la "
-          + "región más cercana es Santiago de Chile.",
-        "",
-        "Estos son los datos de la aplicación:",
-        `- El programa de pedidos (la API) quedó publicado en ${repo}/picanteria-api:v1 y atiende en el puerto 3000.`,
-        `- La página web quedó publicada en ${repo}/picanteria-web:v1 y atiende en el puerto 80. Hay que pasarle la dirección de la API en la variable API_URL.`,
-        "- Las dos partes se abren desde internet por HTTPS, y cada una usa su propia cuenta de servicio con los permisos mínimos.",
-        "- La base de datos es PostgreSQL 17: se llama picanteria, con un usuario picanteria, en una instancia llamada "
-          + "picanteria-db-1107, la más pequeña que exista. Tiene IP pública pero sin redes autorizadas: la API se conecta "
-          + "solo por el conector de Cloud SQL de Cloud Run, por socket en /cloudsql.",
-        "- La API necesita estas variables: DATABASE_URL (URL de Prisma con host=/cloudsql/<nombre de conexión de la instancia>), "
-          + "COOKIE_SECURE con valor \"true\", INITIAL_ADMIN_USERNAME con valor \"admin\" e INITIAL_ADMIN_PASSWORD.",
-        "- DATABASE_URL y la contraseña del administrador se guardan en Secret Manager. Las contraseñas las escribo yo al desplegar.",
-        "- La dirección pública de la página web debe quedar en una salida llamada service_url.",
-      ].join("\n"),
+      etiqueta: "Caso real: tengo en mi computadora el sistema de pedidos de mi picantería. Adjunte la carpeta de la aplicación.",
+      // Solo lo que diría el dueño del negocio. Los datos técnicos salen de la carpeta que adjunta.
+      texto: "Tengo una picantería y quiero poner en internet nuestro sistema de pedidos, para que los mozos y la cocina lo "
+        + "usen desde el celular. Lo tenemos en nuestra computadora; adjunto la carpeta del sistema. Quiero que cueste lo "
+        + "menos posible y poder borrarlo todo cuando terminemos de probar. Estamos en Arequipa; la región más cercana es "
+        + "Santiago de Chile.",
     }];
   }
 
+  // ---------------------------------------------------------------- carpeta de la aplicación
+  // El navegador lee solo archivos de configuración conocidos y les quita los valores que parecen
+  // secretos antes de enviarlos. El servidor repite los dos controles (agent/proyecto.py).
+
+  const SECRETO = /PASS|PWD|SECRET|KEY|TOKEN|CREDENTIAL|DATABASE_URL|DSN|CONNECTION_STRING/i;
+  const CARPETAS_IGNORADAS = ["node_modules", ".git", "dist", "build", ".next", "coverage", "vendor", "__pycache__", ".venv"];
+  const ENV_EJEMPLO = [".env.example", ".env.sample", ".env.template"];
+  const COMPOSE = ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"];
+  const MAX_ARCHIVOS_PROYECTO = 40;
+  const MAX_CARACTERES_ARCHIVO = 30000;
+
+  function rutaPermitida(ruta) {
+    const partes = ruta.split("/");
+    if (!ruta || partes.length > 6 || partes.some((p) => p === "" || p === "." || p === "..")) return false;
+    if (partes.slice(0, -1).some((p) => CARPETAS_IGNORADAS.includes(p))) return false;
+    const n = partes[partes.length - 1].toLowerCase();
+    if (n === ".env" || (n.startsWith(".env") && !ENV_EJEMPLO.includes(n))) return false;
+    return n === "dockerfile" || n.startsWith("dockerfile.") || n.endsWith(".dockerfile") || COMPOSE.includes(n)
+      || ENV_EJEMPLO.includes(n) || n === "package.json" || n === "schema.prisma"
+      || n.endsWith(".conf.template") || (n.endsWith(".conf") && n.includes("nginx"));
+  }
+
+  function sinValoresSecretos(ruta, texto) {
+    const n = ruta.split("/").pop().toLowerCase();
+    if (!ENV_EJEMPLO.includes(n) && !COMPOSE.includes(n)) return texto;
+    return texto.split("\n").map((linea) => {
+      const m = /^(\s*(?:-\s*)?(?:export\s+)?)([A-Za-z_]\w*)(\s*[:=]\s*)(.*)$/.exec(linea);
+      if (!m || !m[4].trim()) return linea;
+      return SECRETO.test(m[2]) || /:\/\/[^/\s]*@/.test(m[4]) ? `${m[1]}${m[2]}${m[3]}` : linea;
+    }).join("\n");
+  }
+
+  async function leerCarpeta(lista) {
+    const archivos = [];
+    const entradas = new Set();
+    let raiz = "aplicacion";
+    for (const f of lista) {
+      const partes = (f.webkitRelativePath || f.name).split("/");
+      if (partes.length > 1) { raiz = partes[0]; entradas.add(partes[1]); }
+      const rel = partes.length > 1 ? partes.slice(1).join("/") : f.name;
+      if (!rutaPermitida(rel) || f.size > MAX_CARACTERES_ARCHIVO || archivos.length >= MAX_ARCHIVOS_PROYECTO) continue;
+      archivos.push({ ruta: rel, contenido: sinValoresSecretos(rel, (await f.text()).slice(0, MAX_CARACTERES_ARCHIVO)) });
+    }
+    return { raiz, entradas: [...entradas].slice(0, 200), archivos };
+  }
+
+  async function adjuntarCarpeta(lista) {
+    estado.error = null;
+    estado.leyendoProyecto = true;
+    render();
+    try {
+      const carpeta = await leerCarpeta(lista);
+      if (!carpeta.archivos.length) {
+        throw new Error("En esa carpeta no encontré archivos de configuración (Dockerfile, docker-compose, package.json). "
+          + "Elija la carpeta principal de su aplicación.");
+      }
+      estado.proyecto = await api("/api/proyecto", carpeta);
+    } catch (e) {
+      estado.error = e.message;
+    } finally {
+      estado.leyendoProyecto = false;
+      render();
+    }
+  }
+
+  function resumenProyecto(f) {
+    const n = f.componentes.length;
+    const bd = f.base_datos ? `, ${f.base_datos.motor}${f.base_datos.version ? ` ${f.base_datos.version}` : ""}` : "";
+    return `Carpeta ${f.raiz}: ${n} ${n === 1 ? "componente" : "componentes"}${bd}`;
+  }
+
+  // Botón para elegir la carpeta, o el resumen de la que ya se leyó.
+  function selectorCarpeta() {
+    const f = estado.proyecto;
+    if (f) {
+      return el("div", { class: "adjunto" },
+        el("span", { class: "adjunto-nombre", text: resumenProyecto(f) }),
+        el("button", { class: "boton secundario chico", type: "button", text: "Quitar",
+          onclick: () => { estado.proyecto = null; render(); } }));
+    }
+    const entrada = el("input", { type: "file", id: "campo-carpeta", class: "oculto", webkitdirectory: true, multiple: true,
+      "aria-label": "Carpeta de la aplicación" });
+    entrada.addEventListener("change", () => { if (entrada.files.length) adjuntarCarpeta(entrada.files); });
+    return el("div", { class: "adjunto" },
+      entrada,
+      el("button", { class: "boton secundario chico", type: "button", disabled: estado.leyendoProyecto,
+        text: estado.leyendoProyecto ? "Leyendo la carpeta…" : "Adjuntar la carpeta de mi aplicación",
+        onclick: () => entrada.click() }),
+      el("span", { class: "adjunto-nota", text: "Opcional. Solo se leen archivos de configuración; nunca .env ni contraseñas." }));
+  }
+
+  function comandosPublicar(f) {
+    return [`gcloud auth configure-docker ${f.registro}`, ...f.componentes.flatMap((c) => c.comandos)].join("\n");
+  }
+
+  function hojaFicha(f, plegada) {
+    const filas = f.componentes.map((c) => el("tr", {},
+      el("td", {}, el("span", { class: "servicio-nombre", text: c.nombre })),
+      el("td", { text: c.puerto ? String(c.puerto) : "sin dato" }),
+      el("td", { text: c.frameworks.join(", ") || (c.imagen_base || "sin dato") }),
+      el("td", { text: c.variables.join(", ") || "ninguna" })));
+    const bd = f.base_datos;
+    const cuerpo = el("div", { class: "hoja-cuerpo" },
+      el("p", { class: "fila-texto", text: "Esto es lo que leí de su carpeta. Acompaña a su requerimiento para que no tenga que "
+        + "escribir datos técnicos. No se leyeron archivos .env ni valores de contraseñas." }),
+      f.componentes.length ? el("table", { class: "tabla" },
+        el("thead", {}, el("tr", {}, ["Componente", "Puerto", "Hecho con", "Variables que necesita"].map((t) => el("th", { scope: "col", text: t })))),
+        el("tbody", {}, filas)) : null,
+      bd ? el("p", { class: "fila-texto", text: `Base de datos: ${bd.motor}${bd.version ? ` ${bd.version}` : ""}`
+        + `${bd.base ? `, llamada ${bd.base}` : ""}.` }) : null,
+      f.avisos.map((a) => el("p", { class: "error-linea", text: a })),
+      f.componentes.length ? el("div", { class: "publicar" },
+        el("p", { class: "fila-texto", text: "Antes de desplegar, publique sus imágenes. Abra una terminal en la carpeta de su "
+          + "aplicación y ejecute:" }),
+        el("pre", { class: "texto-plano", tabindex: "0", text: comandosPublicar(f) }),
+        f.script ? el("p", { class: "fila-texto" }, "O en un solo paso, desde la carpeta del agente: ", el("code", { text: f.script })) : null) : null,
+      el("details", { class: "hallazgos" },
+        el("summary", {}, `Archivos leídos `, el("span", { text: `(${f.archivos_leidos.length})` })),
+        el("ul", { class: "lista" }, f.archivos_leidos.map((a) => el("li", { text: a })))),
+      el("details", { class: "hallazgos" },
+        el("summary", { text: "Texto que recibe el agente" }),
+        el("pre", { class: "texto-plano envuelto", tabindex: "0", text: f.texto })));
+    const cabeza = el("div", { class: "hoja-cabeza" },
+      el("h2", { class: "hoja-titulo", text: "Ficha del proyecto" }),
+      el("p", { class: "hoja-estado", text: `Leída de la carpeta ${f.raiz}` }));
+    if (!plegada) return el("article", { class: "hoja" }, cabeza, cuerpo);
+    return el("article", { class: "hoja" }, cabeza,
+      el("details", { class: "plegable" }, el("summary", { text: "Mostrar la ficha del proyecto" }), cuerpo));
+  }
+
   const estado = { info: null, sesion: null, archivo: null, sondeo: null, error: null, enviando: false, firma: "",
-    borradores: {}, borradorId: "", errorDespliegue: null };
+    borradores: {}, borradorId: "", errorDespliegue: null, proyecto: null, leyendoProyecto: false };
 
   // ---------------------------------------------------------------- utilidades
 
@@ -261,7 +372,7 @@
     let texto = ev.texto || "";
     let nota = null;
     let clase = ev.autor;
-    if (ev.tipo === "requerimiento") nota = `Región ${ev.region}`;
+    if (ev.tipo === "requerimiento") nota = `Región ${ev.region}${ev.proyecto ? `. Adjuntó la carpeta ${ev.proyecto}` : ""}`;
     if (ev.tipo === "especificacion") {
       texto = ev.revision === "A"
         ? "Propuse la especificación (revisión A). Revísela en la mesa de trabajo: apruébela o escriba qué cambiar."
@@ -373,8 +484,13 @@
     const boton = el("button", { class: "boton", type: "submit", disabled: estado.enviando, text: "Analizar requerimiento" });
     const formulario = el("form", { class: "formulario", onsubmit: (e) => {
       e.preventDefault();
-      enviar(() => api("/api/sesiones", { requerimiento: campo.value, region: region.value }));
-    } }, campo, el("div", { class: "fila-acciones" },
+      const ficha = estado.proyecto;
+      enviar(async () => {
+        const r = await api("/api/sesiones", { requerimiento: campo.value, region: region.value, proyecto: ficha ? ficha.id : null });
+        estado.proyecto = null;
+        return r;
+      });
+    } }, campo, selectorCarpeta(), el("div", { class: "fila-acciones" },
       el("label", { class: "selector" }, "Región", region), contador, boton));
     campo.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) formulario.requestSubmit();
@@ -426,7 +542,10 @@
     const mesa = document.getElementById("mesa");
     const s = estado.sesion;
     const scroll = mesa.scrollTop;
-    if (!s) { mesa.replaceChildren(introduccion()); return; }
+    if (!s) {
+      mesa.replaceChildren(...[estado.proyecto ? hojaFicha(estado.proyecto, false) : null, introduccion()].filter(Boolean));
+      return;
+    }
     // Lo que importa en cada momento va arriba; la especificación aprobada pasa al final.
     const partes = [];
     const enRevision = s.estado === "analizando" || s.estado === "revision";
@@ -436,6 +555,7 @@
     if (s.estado === "generando" || s.resultado || s.intentos.length) partes.push(lineaDeControles(s));
     if (s.resultado && Object.keys(s.resultado.archivos).length) partes.push(archivos(s));
     if (!enRevision && s.especificacion) partes.push(hojaEspecificacion(s, true));
+    if (s.proyecto) partes.push(hojaFicha(s.proyecto, true));
     if (s.estado === "error" && !s.especificacion) {
       partes.push(el("div", { class: "aviso-despliegue" },
         "No se obtuvo una especificación válida. Reformule el requerimiento con más detalle y vuelva a intentarlo."));
@@ -620,12 +740,16 @@
   function avisoImagenes(s) {
     const imagenes = imagenesDelCodigo(s);
     if (!imagenes.length) return null;
+    const f = s.proyecto;
     return el("div", { class: "publicar" },
-      el("p", { class: "fila-texto", text: "Este código usa estas imágenes. Tienen que estar publicadas antes de aplicar el "
-        + "plan; si falta alguna, publíquela desde la carpeta de su aplicación con docker build y docker push." }),
+      el("p", { class: "fila-texto", text: "Este código usa estas imágenes. Tienen que estar publicadas antes de aplicar el plan."
+        + (f ? "" : " Si falta alguna, publíquela desde la carpeta de su aplicación con docker build y docker push.") }),
       el("ul", { class: "lista" }, imagenes.map((img) => el("li", {},
         el("code", { text: img }),
-        img.includes("cloudrun/container/hello") ? " (imagen de ejemplo de Google: no es su aplicación)" : null))));
+        img.includes("cloudrun/container/hello") ? " (imagen de ejemplo de Google: no es su aplicación)" : null))),
+      f && f.componentes.length ? el("details", { class: "hallazgos" },
+        el("summary", { text: "Cómo publicarlas desde la carpeta de su aplicación" }),
+        el("pre", { class: "texto-plano", tabindex: "0", text: comandosPublicar(f) })) : null);
   }
 
   function confirmacionProyecto(s, d, { etiqueta, boton, alterno }) {

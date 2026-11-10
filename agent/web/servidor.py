@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import urlsplit
 
+from agent import proyecto
 from agent.deploy import ResultadoDespliegue, ejecutar_despliegue
 from agent.pipeline import Agente
 from agent.schemas import Escenario, ResultadoCorrida
@@ -49,6 +50,7 @@ _VARIABLES_DEL_SANDBOX = ("project_id", "region")
 MAX_REQUERIMIENTO = 4000
 MAX_CORRECCION = 2000
 MAX_CUERPO = 64 * 1024
+MAX_CUERPO_PROYECTO = 700 * 1024    # los archivos de configuración de la carpeta de la aplicación
 MAX_SESIONES = 20
 REGIONES = ("southamerica-west1", "southamerica-east1", "us-central1", "us-east1", "europe-west1")
 HOSTS_LOCALES = {"127.0.0.1", "localhost", "::1"}
@@ -96,6 +98,8 @@ class Sesion:
     escenario: Escenario
     res: ResultadoCorrida
     despliegue: Despliegue | None = None
+    requerimiento_usuario: str = ""     # lo que escribió la persona, sin la ficha
+    ficha: dict | None = None           # ficha técnica leída de la carpeta de su aplicación
     estado: str = "analizando"      # analizando, revision, generando, terminado, error
     error: str | None = None        # error que termina la sesión
     aviso: str | None = None        # error recuperable (una corrección que no se pudo aplicar)
@@ -123,14 +127,47 @@ class Aplicacion:
         self.probar = probar
         self.espera_confirmacion_s = espera_confirmacion_s
         self.sesiones: dict[str, Sesion] = {}
+        self.fichas: dict[str, dict] = {}     # fichas de proyecto recién leídas, por id
         self.ocupado = threading.Lock()   # un trabajo con el LLM a la vez
         self.desplegando = threading.Lock()   # un despliegue a la vez
         self.mutex = threading.Lock()     # protege el diccionario de sesiones
 
     # ------------------------------------------------------------------ acciones
 
-    def crear(self, requerimiento: str, region: str) -> Sesion:
+    def leer_proyecto(self, cuerpo: dict) -> dict:
+        """Arma la ficha técnica con los archivos que el navegador leyó de la carpeta de la aplicación.
+
+        No usa el modelo ni guarda los archivos: solo queda la ficha, sin valores secretos.
+        """
+        lista = cuerpo.get("archivos")
+        if not isinstance(lista, list) or not lista:
+            raise ErrorPeticion(HTTPStatus.BAD_REQUEST, "No llegó ningún archivo del proyecto.")
+        archivos = {}
+        for a in lista:
+            if not (isinstance(a, dict) and isinstance(a.get("ruta"), str) and isinstance(a.get("contenido"), str)):
+                raise ErrorPeticion(HTTPStatus.BAD_REQUEST, "Formato de archivos no válido.")
+            archivos[a["ruta"]] = a["contenido"]
+        entradas = [str(e)[:80] for e in cuerpo.get("entradas") or [] if isinstance(e, str)][:200]
+        try:
+            ficha = proyecto.analizar(archivos, raiz=str(cuerpo.get("raiz") or "aplicacion"), entradas_raiz=entradas,
+                                      repositorio=self.info.get("repositorio"))
+        except proyecto.ProyectoInvalido as e:
+            raise ErrorPeticion(HTTPStatus.BAD_REQUEST, str(e)) from None
+        ficha["id"] = secrets.token_hex(8)
+        with self.mutex:
+            self.fichas[ficha["id"]] = ficha
+            for viejo in list(self.fichas)[:-MAX_SESIONES]:
+                del self.fichas[viejo]
+        return ficha
+
+    def crear(self, requerimiento: str, region: str, ficha_id: str | None = None) -> Sesion:
         requerimiento = (requerimiento or "").strip()
+        ficha = None
+        if ficha_id:
+            with self.mutex:
+                ficha = self.fichas.get(ficha_id)
+            if ficha is None:
+                raise ErrorPeticion(HTTPStatus.BAD_REQUEST, "La ficha del proyecto ya no está disponible; vuelva a elegir la carpeta.")
         if len(requerimiento) < 20:
             raise ErrorPeticion(HTTPStatus.BAD_REQUEST, "Describa el requerimiento con al menos 20 caracteres.")
         if len(requerimiento) > MAX_REQUERIMIENTO:
@@ -140,10 +177,14 @@ class Aplicacion:
             raise ErrorPeticion(HTTPStatus.BAD_REQUEST, "Región no admitida.")
         ahora = datetime.now()
         titulo = " ".join(requerimiento.split())[:80]
+        # La ficha acompaña al requerimiento como texto: el prompt de analizar es el mismo del experimento.
+        completo = requerimiento + ("\n\n" + ficha["texto"] if ficha else "")
         esc = Escenario(id=f"WEB-{ahora:%Y%m%d-%H%M%S}", nivel="interactivo", titulo=titulo,
-                        requerimiento=requerimiento, contexto={"region": region, "entornos": ["dev"]})
-        sesion = Sesion(id=secrets.token_hex(8), escenario=esc, res=self.agente.iniciar(esc, "T1"))
-        sesion.eventos.append({"autor": "usted", "tipo": "requerimiento", "texto": requerimiento, "region": region})
+                        requerimiento=completo, contexto={"region": region, "entornos": ["dev"]})
+        sesion = Sesion(id=secrets.token_hex(8), escenario=esc, res=self.agente.iniciar(esc, "T1"),
+                        requerimiento_usuario=requerimiento, ficha=ficha)
+        sesion.eventos.append({"autor": "usted", "tipo": "requerimiento", "texto": requerimiento, "region": region,
+                               "proyecto": ficha["raiz"] if ficha else None})
         self._lanzar(sesion, "analizando", lambda: self._analizar(sesion, None))
         with self.mutex:
             self.sesiones[sesion.id] = sesion
@@ -394,7 +435,8 @@ class Aplicacion:
             "etapa": self._etapa(sesion, llamadas, intentos),
             "error": sesion.error,
             "aviso": sesion.aviso,
-            "requerimiento": sesion.escenario.requerimiento,
+            "requerimiento": sesion.requerimiento_usuario or sesion.escenario.requerimiento,
+            "proyecto": sesion.ficha,
             "region": sesion.escenario.contexto.get("region"),
             "correcciones": list(sesion.correcciones),
             "eventos": list(sesion.eventos),
@@ -512,10 +554,14 @@ class Manejador(BaseHTTPRequestHandler):
         raise ErrorPeticion(HTTPStatus.NOT_FOUND, "No encontrado.")
 
     def _post(self, ruta: str) -> None:
-        cuerpo = self._cuerpo()
+        cuerpo = self._cuerpo(MAX_CUERPO_PROYECTO if ruta == "/api/proyecto" else MAX_CUERPO)
+        if ruta == "/api/proyecto":
+            return self._json(self.app.leer_proyecto(cuerpo))
         if ruta == "/api/sesiones":
+            ficha_id = cuerpo.get("proyecto")
             s = self.app.crear(str(cuerpo.get("requerimiento", "")),
-                               str(cuerpo.get("region", self.app.info.get("region", REGIONES[0]))))
+                               str(cuerpo.get("region", self.app.info.get("region", REGIONES[0]))),
+                               str(ficha_id) if ficha_id else None)
             return self._json(self.app.vista(s), HTTPStatus.ACCEPTED)
         if m := re.fullmatch(rf"/api/sesiones/{_ID}/correcciones", ruta):
             s = self.app.corregir(m.group(1), str(cuerpo.get("texto", "")))
@@ -552,14 +598,14 @@ class Manejador(BaseHTTPRequestHandler):
         if origen and urlsplit(origen).netloc != host:
             raise ErrorPeticion(HTTPStatus.FORBIDDEN, "Origen no permitido.")
 
-    def _cuerpo(self) -> dict:
+    def _cuerpo(self, maximo: int = MAX_CUERPO) -> dict:
         if not self.headers.get("Content-Type", "").startswith("application/json"):
             raise ErrorPeticion(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, "Se espera JSON.")
         try:
             largo = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             raise ErrorPeticion(HTTPStatus.BAD_REQUEST, "Content-Length inválido.") from None
-        if largo > MAX_CUERPO:
+        if largo > maximo:
             raise ErrorPeticion(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "Solicitud demasiado grande.")
         try:
             datos = json.loads(self.rfile.read(largo) or b"{}")

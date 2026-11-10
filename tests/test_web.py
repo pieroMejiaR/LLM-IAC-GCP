@@ -322,3 +322,34 @@ def test_no_se_despliega_codigo_que_no_paso_los_controles(web):
     v = vista(base, sid)
     assert not v["despliegue"]["desplegable"] and "controles" in v["despliegue"]["motivo"]
     assert pedir(f"{base}/api/sesiones/{sid}/despliegue", {"variables": {}})[0] == 409
+
+
+# ---------------------------------------------------------------------- carpeta de la aplicación
+
+
+def test_la_ficha_del_proyecto_acompana_al_requerimiento_sin_secretos(web):
+    base, fn = web([json.dumps(SPEC_A), CODIGO_OK])
+    carpeta = {"raiz": "tienda", "entradas": ["apps"], "archivos": [
+        {"ruta": "Dockerfile", "contenido": "FROM node:22-slim\nEXPOSE 3000\nCMD node main.js\n"},
+        {"ruta": ".env.example", "contenido": "API_KEY=ClaveQueNoDebeSalir\nMODO=produccion\n"}]}
+    estado, _, cuerpo = pedir(f"{base}/api/proyecto", carpeta)
+    ficha = json.loads(cuerpo)
+    assert estado == 200 and ficha["componentes"][0]["puerto"] == 3000 and b"ClaveQueNoDebeSalir" not in cuerpo
+
+    _, _, cuerpo = pedir(f"{base}/api/sesiones", {"requerimiento": REQ, "region": REGIONES[0], "proyecto": ficha["id"]})
+    sid = json.loads(cuerpo)["id"]
+    v = esperar(base, sid, "revision")
+    # La persona ve su texto; el agente recibe además la ficha, dentro del requerimiento.
+    assert v["requerimiento"] == REQ and v["proyecto"]["raiz"] == "tienda" and v["eventos"][0]["proyecto"] == "tienda"
+    assert "Ficha técnica del proyecto" in fn.prompts[0] and "puerto 3000" in fn.prompts[0]
+    assert "ClaveQueNoDebeSalir" not in fn.prompts[0]
+
+
+def test_la_carpeta_no_acepta_env_ni_fichas_desconocidas(web):
+    base, _ = web([])
+    malo = {"raiz": "x", "archivos": [{"ruta": ".env", "contenido": "CLAVE=1"}]}
+    estado, _, cuerpo = pedir(f"{base}/api/proyecto", malo)
+    assert estado == 400 and "no permitido" in json.loads(cuerpo)["error"]
+    assert pedir(f"{base}/api/proyecto", {"archivos": []})[0] == 400
+    assert pedir(f"{base}/api/proyecto", {"archivos": [{"ruta": "Dockerfile"}]})[0] == 400
+    assert pedir(f"{base}/api/sesiones", {"requerimiento": REQ, "region": REGIONES[0], "proyecto": "0123456789abcdef"})[0] == 400
