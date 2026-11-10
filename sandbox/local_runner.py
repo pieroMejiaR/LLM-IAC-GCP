@@ -432,17 +432,24 @@ class ValidadorLocal:
 class DesplegadorLocal:
     """Modo despliegue con la cuenta de servicio de despliegue. Lo invoca solo agent.deploy."""
 
-    def __init__(self, proyecto: str, region: str, cuenta_despliegue: str, directorio: Path) -> None:
+    def __init__(self, proyecto: str, region: str, cuenta_despliegue: str, directorio: Path,
+                 variables: dict[str, str] | None = None) -> None:
         if not (proyecto and cuenta_despliegue):
             raise ValueError("El modo despliegue requiere GCP_PROYECTO y GCP_CUENTA_DESPLIEGUE")
         self.proyecto = proyecto
         self.region = region
         self.cuenta = cuenta_despliegue
         self.directorio = Path(directorio)
+        # Valores reales de las variables sin default (contraseñas): los escribe quien despliega.
+        # Solo viven en memoria y en el entorno de terraform plan; el plan guardado los lleva al apply.
+        self.variables = {f"TF_VAR_{k}": v for k, v in (variables or {}).items()}
         self.ej = _Ejecutor(PERMITIDOS_DESPLIEGUE, timeout_s=1800)
 
     def _env(self) -> dict[str, str]:
         return _entorno_base(self.proyecto, self.region, self.cuenta)
+
+    def _env_plan(self) -> dict[str, str]:
+        return {**self._env(), **self.variables}
 
     def planificar(self, archivos: dict[str, str]) -> PlanDespliegue:
         d = self.directorio
@@ -458,7 +465,7 @@ class DesplegadorLocal:
         if rc:
             return plan
         rc, out, err, dur = self.ej.terraform_cmd(
-            ["plan", "-input=false", "-no-color", "-json", "-out=plan.tfplan"], d, env)
+            ["plan", "-input=false", "-no-color", "-json", "-out=plan.tfplan"], d, self._env_plan())
         diags = parse_plan_json_lines(out)
         if rc and not diags:
             diags = parse_texto_errores(err, "plan")
@@ -484,6 +491,11 @@ class DesplegadorLocal:
         return {k: v.get("value") for k, v in json.loads(out or "{}").items()}
 
     def destruir(self, directorio: str) -> ResultadoControl:
+        # destroy también exige un valor para cada variable sin default, aunque al borrar no se use:
+        # basta un valor de relleno, así no hay que volver a escribir las contraseñas.
+        d = Path(directorio)
+        archivos = {p.name: p.read_text(encoding="utf-8") for p in d.glob("*.tf")}
+        env = {**self._env(), **valores_de_relleno(archivos)}
         rc, out, err, dur = self.ej.terraform_cmd(
-            ["destroy", "-input=false", "-no-color", "-auto-approve"], Path(directorio), self._env())
+            ["destroy", "-input=false", "-no-color", "-auto-approve"], d, env)
         return _control("destroy", rc == 0, parse_texto_errores(err, "destroy") if rc else [], dur, out + err)

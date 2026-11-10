@@ -9,6 +9,7 @@ from sandbox.local_runner import (
     _RELLENO,
     PERMITIDOS_EVALUACION,
     ComandoNoPermitido,
+    DesplegadorLocal,
     _entorno_base,
     _Ejecutor,
     clasificar_origen,
@@ -179,6 +180,24 @@ def test_valores_de_relleno_para_variables_sin_default():
         "TF_VAR_db_password": _RELLENO, "TF_VAR_n": "1", "TF_VAR_lista": "[]", "TF_VAR_mapa": "{}",
         "TF_VAR_activo": "false", "TF_VAR_sin_tipo": _RELLENO}
     assert len(_RELLENO) >= 12   # cumple validaciones de longitud como la de proyecto_completo
+
+
+def test_despliegue_usa_valores_reales_en_plan_y_relleno_al_destruir(tmp_path, monkeypatch):
+    d = DesplegadorLocal("p", "southamerica-west1", "deploy@p.iam.gserviceaccount.com", tmp_path,
+                         variables={"db_password": "valor-real"})
+    assert d._env_plan()["TF_VAR_db_password"] == "valor-real"
+    assert "TF_VAR_db_password" not in d._env()   # apply y output no lo necesitan: el plan guardado lo lleva
+    (tmp_path / "variables.tf").write_text('variable "db_password" {\n  type      = string\n  sensitive = true\n}\n',
+                                           encoding="utf-8")
+    visto: dict = {}
+
+    def terraform(args, cwd, env):
+        visto.update(env)
+        return 0, "", "", 0.0
+
+    monkeypatch.setattr(d.ej, "terraform_cmd", terraform)
+    assert d.destruir(str(tmp_path)).ok
+    assert visto["TF_VAR_db_password"] == _RELLENO
 
 
 @S1

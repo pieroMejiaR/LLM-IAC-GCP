@@ -98,7 +98,16 @@ def desplegar(
         typer.secho("El código no pasó todos los controles en modo evaluación; no se despliega.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    desplegador = DesplegadorLocal(cfg.proyecto_gcp, cfg.region, cfg.cuenta_despliegue, d / "despliegue")
+    # Las variables sin default (contraseñas, claves) se piden aquí, sin mostrarlas ni guardarlas.
+    from sandbox.guard import variables_sin_valor
+    valores = {}
+    for nombre in variables_sin_valor(res.archivos):
+        if nombre in ("project_id", "region"):
+            continue
+        valores[nombre] = os.environ.get(f"TF_VAR_{nombre}") or typer.prompt(
+            f"Valor de la variable {nombre} (no se muestra ni se guarda)", hide_input=True)
+    desplegador = DesplegadorLocal(cfg.proyecto_gcp, cfg.region, cfg.cuenta_despliegue, d / "despliegue",
+                                   variables=valores)
     resultado = ejecutar_despliegue(
         res.archivos, desplegador,
         proyecto_id=cfg.proyecto_gcp,

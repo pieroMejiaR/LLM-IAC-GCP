@@ -1,6 +1,7 @@
 # Caso real: sistema de pedidos de la picantería (repositorio picanteria-digital).
-# Antes de desplegar: publicar las dos imágenes en Artifact Registry y reemplazar PROYECTO
-# en contexto.imagen_api y contexto.imagen_web. La web debe leer API_URL (ver mensaje a Paolo).
+# Antes de desplegar: publicar las dos imágenes en el repositorio apps de agente-iac-pm
+# (contexto.imagen_api y contexto.imagen_web). La web debe leer API_URL (ver mensaje a Paolo).
+# desplegar pide las contraseñas sin mostrarlas; conviene usar solo letras y números.
 # Si un apply falla y hay que destruir y repetir, cambiar el sufijo de picanteria-db-1107 en el
 # requerimiento y el checklist: Cloud SQL no deja reutilizar el nombre de una instancia borrada por varios días.
 id: REAL-01
@@ -27,8 +28,8 @@ requerimiento: >
 contexto:
   region: southamerica-west1
   entornos: [dev]
-  imagen_api: southamerica-west1-docker.pkg.dev/PROYECTO/apps/picanteria-api:v1
-  imagen_web: southamerica-west1-docker.pkg.dev/PROYECTO/apps/picanteria-web:v1
+  imagen_api: southamerica-west1-docker.pkg.dev/agente-iac-pm/apps/picanteria-api:v1
+  imagen_web: southamerica-west1-docker.pkg.dev/agente-iac-pm/apps/picanteria-web:v1
   puerto_api: 3000
   puerto_web: 80
 servicios_esperados:
