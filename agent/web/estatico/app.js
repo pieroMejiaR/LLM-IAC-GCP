@@ -51,20 +51,21 @@
   function ejemplos() {
     const i = estado.info;
     if (!i || !i.despliegue || !i.proyecto) return EJEMPLOS;
-    const repo = `southamerica-west1-docker.pkg.dev/${i.proyecto}/apps`;
+    const repo = i.repositorio || `southamerica-west1-docker.pkg.dev/${i.proyecto}/apps`;
     return [...EJEMPLOS, {
-      etiqueta: "Caso real: quiero poner en internet el sistema de pedidos de mi picantería, con los datos que me dio mi desarrollador.",
+      etiqueta: "Caso real: tengo en mi computadora el sistema de pedidos de mi picantería y quiero ponerlo en internet.",
       // Primero, lo que diría el dueño del negocio; después, la ficha de la aplicación. Sin esa ficha
       // el agente no sabe qué imagen usar ni cómo conectar la API con la base de datos.
       texto: [
         "Tengo una picantería y quiero poner en internet nuestro sistema de pedidos, para que los mozos y la cocina lo "
-          + "usen desde el celular. Tiene dos partes que mi desarrollador ya dejó subidas a Google Cloud: la página web y el "
-          + "programa que guarda los pedidos. También necesita una base de datos. Quiero que cueste lo menos posible y poder "
-          + "borrarlo todo cuando terminemos de probar. Estamos en Arequipa; la región más cercana es Santiago de Chile.",
+          + "usen desde el celular. Lo tenemos en nuestra computadora y tiene dos partes: la página web y el programa que "
+          + "guarda los pedidos. Ya publiqué las dos con el paso «Publique su aplicación». También necesita una base de datos. "
+          + "Quiero que cueste lo menos posible y poder borrarlo todo cuando terminemos de probar. Estamos en Arequipa; la "
+          + "región más cercana es Santiago de Chile.",
         "",
-        "Estos son los datos que me dio mi desarrollador:",
-        `- El programa de pedidos (la API) está en ${repo}/picanteria-api:v1 y atiende en el puerto 3000.`,
-        `- La página web está en ${repo}/picanteria-web:v1 y atiende en el puerto 80. Hay que pasarle la dirección de la API en la variable API_URL.`,
+        "Estos son los datos de la aplicación:",
+        `- El programa de pedidos (la API) quedó publicado en ${repo}/picanteria-api:v1 y atiende en el puerto 3000.`,
+        `- La página web quedó publicada en ${repo}/picanteria-web:v1 y atiende en el puerto 80. Hay que pasarle la dirección de la API en la variable API_URL.`,
         "- Las dos partes se abren desde internet por HTTPS, y cada una usa su propia cuenta de servicio con los permisos mínimos.",
         "- La base de datos es PostgreSQL 17: se llama picanteria, con un usuario picanteria, en una instancia llamada "
           + "picanteria-db-1107, la más pequeña que exista. Tiene IP pública pero sin redes autorizadas: la API se conecta "
@@ -465,7 +466,59 @@
       el("div", { style: null },
         el("h3", { class: "subtitulo", text: "Servicios que conoce" }),
         el("div", { class: "catalogo" }, Object.values(SERVICIO).map((n) => el("span", { text: n })))),
+      estado.info && estado.info.despliegue ? guiaPublicar() : null,
       avisoDespliegue());
+  }
+
+  // Paso previo para quien tiene la aplicación en su computadora: publicar la imagen. Se hace en su
+  // máquina con Docker; el agente no puede hacerlo desde el sandbox (sin Docker ni internet).
+  function guiaPublicar() {
+    const repo = estado.info.repositorio;
+    const borrador = estado.publicar || { nombre: "", dockerfile: "" };
+    const nombre = el("input", { type: "text", id: "pub-nombre", class: "campo-linea", autocomplete: "off",
+      spellcheck: "false", placeholder: "mi-aplicacion", maxlength: "60" });
+    const dockerfile = el("input", { type: "text", id: "pub-dockerfile", class: "campo-linea", autocomplete: "off",
+      spellcheck: "false", placeholder: "Dockerfile", maxlength: "120" });
+    nombre.value = borrador.nombre;
+    dockerfile.value = borrador.dockerfile;
+    const comandos = el("pre", { class: "texto-plano", tabindex: "0", "aria-label": "Comandos para publicar la imagen" });
+    const ruta = el("code", {});
+    const actualizar = () => {
+      estado.publicar = { nombre: nombre.value, dockerfile: dockerfile.value };
+      const n = (nombre.value.trim() || "mi-aplicacion").toLowerCase().replace(/[^a-z0-9._-]+/g, "-");
+      const f = dockerfile.value.trim().replace(/[^\w./\\-]+/g, "") || "Dockerfile";
+      const imagen = `${repo}/${n}:v1`;
+      comandos.textContent = [
+        `gcloud auth configure-docker ${repo.split("/")[0]}`,
+        `docker build -t ${imagen} -f ${f} .`,
+        `docker push ${imagen}`,
+      ].join("\n");
+      ruta.textContent = imagen;
+    };
+    nombre.addEventListener("input", actualizar);
+    dockerfile.addEventListener("input", actualizar);
+    actualizar();
+    return el("div", { class: "publicar" },
+      el("h3", { class: "subtitulo", text: "Si su aplicación está en su computadora: publíquela primero" }),
+      el("p", { class: "fila-texto", text: "Cloud Run ejecuta aplicaciones empaquetadas como una imagen, y esa imagen tiene que "
+        + "estar en el registro de Google antes de desplegar. Este paso se hace en su computadora, con Docker: el agente trabaja "
+        + "en un sandbox sin Docker ni internet y no puede hacerlo por usted. Si solo necesita guardar archivos o una base de "
+        + "datos, no hace falta." }),
+      el("div", { class: "publicar-campos" },
+        el("label", { class: "campo-var" }, el("span", { text: "Nombre para la imagen" }), nombre),
+        el("label", { class: "campo-var" }, el("span", { text: "Dockerfile, desde la carpeta de la aplicación" }), dockerfile)),
+      el("p", { class: "fila-texto", text: "Abra una terminal en la carpeta de su aplicación y ejecute:" }),
+      comandos,
+      el("p", { class: "fila-texto" }, "Cuando termine, indique en su requerimiento que la imagen está en ", ruta,
+        ". Si la aplicación tiene varias partes, repita el paso con cada una."),
+      el("p", { class: "fila-texto" }, "Con el script del repositorio se hace en un solo paso: ",
+        el("code", { text: ".\\scripts\\publicar-imagenes.ps1 -Carpeta <carpeta> -Imagen nombre=Dockerfile" })));
+  }
+
+  // Imágenes de contenedor que usa el código generado: deben existir antes de aplicar el plan.
+  function imagenesDelCodigo(s) {
+    const texto = Object.values(s.resultado.archivos).join("\n");
+    return [...new Set(texto.match(/[a-z0-9-]+-docker\.pkg\.dev\/[\w./-]+(?::[\w.-]+)?/g) || [])];
   }
 
   function avisoDespliegue() {
@@ -556,11 +609,23 @@
       ? "Puede preparar el plan otra vez."
       : `Este código pasó todos los controles y se puede desplegar en el proyecto ${d.proyecto}. `
         + "Primero se calcula el plan; nada se crea hasta que usted lo apruebe." }),
+    avisoImagenes(s),
     campos.length ? el("p", { class: "fila-texto", text: "El plan necesita estos valores. Se usan solo en este "
       + "despliegue: no se guardan ni se muestran. Conviene usar solo letras y números." }) : null,
     campos,
     el("div", { class: "fila-acciones" },
       el("button", { class: "boton", type: "submit", disabled: estado.enviando, text: "Preparar el plan de despliegue" })));
+  }
+
+  function avisoImagenes(s) {
+    const imagenes = imagenesDelCodigo(s);
+    if (!imagenes.length) return null;
+    return el("div", { class: "publicar" },
+      el("p", { class: "fila-texto", text: "Este código usa estas imágenes. Tienen que estar publicadas antes de aplicar el "
+        + "plan; si falta alguna, publíquela desde la carpeta de su aplicación con docker build y docker push." }),
+      el("ul", { class: "lista" }, imagenes.map((img) => el("li", {},
+        el("code", { text: img }),
+        img.includes("cloudrun/container/hello") ? " (imagen de ejemplo de Google: no es su aplicación)" : null))));
   }
 
   function confirmacionProyecto(s, d, { etiqueta, boton, alterno }) {

@@ -542,6 +542,13 @@ details.hallazgos summary span { font-weight: 400; color: var(--grafito-3); }
 .simple { padding: 14px 16px; background: var(--papel); border-left: 3px solid var(--grafito); }
 .simple .lista { margin: 8px 0; color: var(--grafito); }
 
+.publicar { padding: 14px 16px; background: var(--hoja); border: 1px solid var(--trazo); border-radius: 2px; }
+.publicar > * + * { margin-top: 10px; }
+.publicar .fila-texto { font-size: var(--t-1); color: var(--grafito-2); max-width: 72ch; }
+.publicar code { font-family: var(--codigo); font-size: var(--t-2); color: var(--grafito); overflow-wrap: anywhere; }
+.publicar-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 620px; }
+.introduccion > .publicar { margin-top: 24px; }
+
 /* ------------------------------------------------------------------ despliegue */
 
 .formulario-despliegue { display: flex; flex-direction: column; gap: 12px; max-width: 620px; }
@@ -663,6 +670,7 @@ details.hallazgos summary span { font-weight: 400; color: var(--grafito-3); }
   .cajetin { width: 100%; }
   .cajetin dd { white-space: normal; overflow-wrap: anywhere; }
   .datos div { grid-template-columns: 1fr; gap: 0; }
+  .publicar-campos { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 560px) {

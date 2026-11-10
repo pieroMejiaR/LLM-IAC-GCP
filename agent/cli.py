@@ -143,6 +143,9 @@ def web(
     info = {
         "despliegue": despliegue,
         "proyecto": cfg.proyecto_gcp if despliegue else None,
+        # Repositorio de Artifact Registry donde la persona publica las imágenes de su aplicación.
+        "repositorio": (os.environ.get("REPOSITORIO_IMAGENES")
+                        or f"{cfg.region}-docker.pkg.dev/{cfg.proyecto_gcp}/apps") if despliegue else None,
         "modelo": cfg.modelo,
         "region": cfg.region if cfg.region in REGIONES else REGIONES[0],
         "regiones": list(REGIONES),

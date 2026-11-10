@@ -83,6 +83,13 @@ Hay dos servicios con la misma página:
 - **`web` (modo evaluación, puerto 8787). Nunca despliega**: no recibe un desplegador y sus rutas de despliegue responden 403. Usa la red y el proxy de evaluación y la cuenta Viewer.
 - **`web-despliegue` (puerto 8788)**, iniciado con `web --despliegue` en la red y con el proxy del modo despliegue. Si el código pasó todos los controles, incluido `plan` con la cuenta Viewer, la página ofrece desplegarlo con el mismo flujo de `desplegar` (`agent/deploy.py`, sin cambios en sus controles): pide las variables sin valor por defecto (contraseñas, que solo viven en memoria), calcula un plan guardado con la cuenta de despliegue, lo rechaza si trae recursos fuera del catálogo o acciones de borrado (S8), lo aplica solo si la persona escribe el ID del proyecto (S7), prueba `service_url` y pide una segunda confirmación para destruir. Sin respuesta en 30 minutos no se aplica nada. La evidencia queda en `resultados/web/<corrida>/evidencia/` y, si los recursos se conservan, se destruyen después con `docker compose run --rm despliegue destruir resultados/web/<corrida>/despliegue`.
 
+**Si la aplicación está en la computadora de quien despliega**, antes hay que publicar su imagen en Artifact Registry: Cloud Run solo ejecuta imágenes que estén en el registro. El agente no puede hacerlo, porque corre en un sandbox sin Docker ni internet, así que el paso se hace en esa máquina. La interfaz de despliegue lo guía (arma los comandos `docker build` y `docker push` con el repositorio del proyecto y, antes de planificar, lista las imágenes que usa el código), y el script lo resuelve en un comando:
+
+```powershell
+.\scripts\publicar-imagenes.ps1 -Carpeta E:\ruta\a\la\aplicacion -Imagen picanteria-api=apps/api/Dockerfile,picanteria-web=apps/web/Dockerfile
+.\scripts\publicar-imagenes.ps1 -Carpeta C:\mi-app -Imagen mi-app=Dockerfile -Simular   # solo muestra los comandos
+```
+
 Las corridas de la interfaz se guardan en `resultados/web/`, fuera de los escenarios del experimento. El servidor usa solo la biblioteca estándar (`agent/web/servidor.py`), atiende un trabajo con el LLM a la vez, solo responde a `localhost` y del mismo origen, y la página inserta el texto del modelo con `textContent`. Los servicios `web` y `web-despliegue` quedan en sus redes internas, como el agente; los puentes `web-puente` y `web-puente-despliegue` (nginx sin privilegios, imagen fijada por digest, `sandbox/puente/`) son las únicas piezas con puerto publicado, solo en 127.0.0.1, y no ejecutan código del agente.
 
 | Capa | Qué hace |
