@@ -531,7 +531,7 @@
         maxlength: "256" });
       entrada.value = estado.borradores[n] || "";
       entrada.addEventListener("input", () => { estado.borradores[n] = entrada.value; });
-      return el("label", { class: "campo-var" }, el("span", { text: n }), entrada);
+      return el("label", { class: "campo-var" }, el("span", { text: `${etiquetaVariable(n)} (${n})` }), entrada);
     });
     return el("form", { class: "formulario-despliegue", onsubmit: (e) => {
       e.preventDefault();
@@ -641,6 +641,7 @@
       el("td", {}, el("span", { class: sv.publico ? "acceso-publico" : "acceso-privado", text: sv.publico ? "Público" : "Privado" })),
       el("td", {}, parametros(sv.parametros))));
     const cuerpo = el("div", { class: "hoja-cuerpo" },
+      enPalabrasSimples(spec),
       el("table", { class: "tabla" },
         el("thead", {}, el("tr", {}, ["Servicio", "Nombre", "Acceso", "Parámetros"].map((t) => el("th", { scope: "col", text: t })))),
         el("tbody", {}, filas)),
@@ -661,6 +662,44 @@
           d.querySelector("summary").textContent = d.open ? "Ocultar la especificación" : "Mostrar la especificación";
         } },
         el("summary", { text: abierta ? "Ocultar la especificación" : "Mostrar la especificación" }), cuerpo));
+  }
+
+  // Lectura de la especificación para quien no conoce los nombres de los servicios.
+  // Se arma aquí, a partir de la especificación: no usa el modelo ni cambia los prompts.
+  const EN_SIMPLE = {
+    cloud_run: (sv) => `Un servicio que ejecuta su aplicación (${sv.nombre}), ${sv.publico
+      ? "abierto a cualquier persona en internet" : "sin acceso público"}. Solo cobra mientras atiende solicitudes.`,
+    cloud_sql_postgres: (sv) => `Una base de datos (${sv.nombre}) ${sv.parametros && sv.parametros.ip_publica === true
+      ? "con dirección pública en internet" : "sin dirección pública: solo se llega a ella desde la red privada"}. `
+      + "Cobra por hora mientras exista, aunque nadie la use.",
+    cloud_storage: (sv) => `Un espacio para guardar archivos (${sv.nombre}), ${sv.publico
+      ? "que cualquier persona en internet puede ver" : "privado"}.`,
+    vpc: (sv) => `Una red privada (${sv.nombre}) para que sus servicios se comuniquen sin pasar por internet.`,
+    secret_manager: (sv) => `Un almacén protegido para una contraseña o clave (${sv.nombre}), en lugar de escribirla en el código.`,
+    iam: (sv) => `Una identidad para la aplicación (${sv.nombre}) con solo los permisos que necesita.`,
+  };
+
+  function enPalabrasSimples(spec) {
+    const publicos = spec.servicios.filter((sv) => sv.publico).length;
+    return el("div", { class: "simple" },
+      el("h3", { class: "subtitulo", text: "En palabras simples" }),
+      el("p", { class: "fila-texto", text: `Se crearían ${spec.servicios.length} ${spec.servicios.length === 1 ? "pieza" : "piezas"} `
+        + `en la región ${spec.region}; ${publicos === 0 ? "ninguna queda abierta a internet"
+          : publicos === 1 ? "una queda abierta a internet" : `${publicos} quedan abiertas a internet`}.` }),
+      el("ul", { class: "lista" }, spec.servicios.map((sv) => el("li", { text: (EN_SIMPLE[sv.tipo] || (() => sv.nombre))(sv) }))),
+      el("p", { class: "fila-texto", text: "Si algo no coincide con lo que necesita, escríbalo con sus palabras en el cuadro de la izquierda. "
+        + "Los supuestos del agente, más abajo, son las decisiones que tomó por usted." }));
+  }
+
+  function etiquetaVariable(nombre) {
+    const n = nombre.toLowerCase();
+    if (/pass|contrasen|clave/.test(n)) {
+      if (/db|database|sql|postgres/.test(n)) return "Contraseña de la base de datos";
+      if (/admin/.test(n)) return "Contraseña del administrador de la aplicación";
+      return "Contraseña";
+    }
+    if (/api_?key|token|secret/.test(n)) return "Clave de acceso de un servicio externo";
+    return "Valor que necesita el código";
   }
 
   function parametros(p) {

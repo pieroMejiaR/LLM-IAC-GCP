@@ -539,6 +539,9 @@ details.hallazgos summary span { font-weight: 400; color: var(--grafito-3); }
   color: var(--grafito-3);
 }
 
+.simple { padding: 14px 16px; background: var(--papel); border-left: 3px solid var(--grafito); }
+.simple .lista { margin: 8px 0; color: var(--grafito); }
+
 /* ------------------------------------------------------------------ despliegue */
 
 .formulario-despliegue { display: flex; flex-direction: column; gap: 12px; max-width: 620px; }
