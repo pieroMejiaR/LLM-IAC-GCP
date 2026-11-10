@@ -53,20 +53,27 @@
     if (!i || !i.despliegue || !i.proyecto) return EJEMPLOS;
     const repo = `southamerica-west1-docker.pkg.dev/${i.proyecto}/apps`;
     return [...EJEMPLOS, {
-      etiqueta: "Caso real: sistema de pedidos de una picantería, con dos servicios de Cloud Run, Cloud SQL y secretos.",
-      texto: "Necesitamos desplegar en Google Cloud el sistema de pedidos de nuestra picantería. Son dos contenedores ya "
-        + `publicados en Artifact Registry: la API en ${repo}/picanteria-api:v1 y la web en ${repo}/picanteria-web:v1. `
-        + "La API (NestJS) escucha en el puerto 3000. La web (nginx) escucha en el puerto 80 y reenvía las rutas /api y "
-        + "/socket.io a la API, cuya URL recibe en la variable de entorno API_URL. Los dos servicios deben ser accesibles "
-        + "públicamente por HTTPS. La API usa PostgreSQL 17 con una base de datos llamada picanteria y un usuario picanteria. "
-        + "La instancia se llama picanteria-db-1107 y debe ser la más pequeña y barata posible, con IP pública pero sin redes "
-        + "autorizadas: la API se conecta solo mediante el conector de Cloud SQL de Cloud Run, por socket en /cloudsql. "
-        + "La API recibe estas variables de entorno: DATABASE_URL (URL de Prisma con host=/cloudsql/<nombre de conexión de la "
-        + "instancia>), COOKIE_SECURE con valor \"true\", INITIAL_ADMIN_USERNAME con valor \"admin\" e INITIAL_ADMIN_PASSWORD. "
-        + "La URL de la base de datos y la contraseña del administrador se guardan en Secret Manager; las contraseñas se "
-        + "reciben como variables sensibles. Los dos servicios usan una cuenta de servicio propia con permisos mínimos. "
-        + "La URL pública de la web se exporta con el nombre service_url. Región: Santiago de Chile. Debe ser lo más barato "
-        + "posible y poder destruirse por completo.",
+      etiqueta: "Caso real: quiero poner en internet el sistema de pedidos de mi picantería, con los datos que me dio mi desarrollador.",
+      // Primero, lo que diría el dueño del negocio; después, la ficha de la aplicación. Sin esa ficha
+      // el agente no sabe qué imagen usar ni cómo conectar la API con la base de datos.
+      texto: [
+        "Tengo una picantería y quiero poner en internet nuestro sistema de pedidos, para que los mozos y la cocina lo "
+          + "usen desde el celular. Tiene dos partes que mi desarrollador ya dejó subidas a Google Cloud: la página web y el "
+          + "programa que guarda los pedidos. También necesita una base de datos. Quiero que cueste lo menos posible y poder "
+          + "borrarlo todo cuando terminemos de probar. Estamos en Arequipa; la región más cercana es Santiago de Chile.",
+        "",
+        "Estos son los datos que me dio mi desarrollador:",
+        `- El programa de pedidos (la API) está en ${repo}/picanteria-api:v1 y atiende en el puerto 3000.`,
+        `- La página web está en ${repo}/picanteria-web:v1 y atiende en el puerto 80. Hay que pasarle la dirección de la API en la variable API_URL.`,
+        "- Las dos partes se abren desde internet por HTTPS, y cada una usa su propia cuenta de servicio con los permisos mínimos.",
+        "- La base de datos es PostgreSQL 17: se llama picanteria, con un usuario picanteria, en una instancia llamada "
+          + "picanteria-db-1107, la más pequeña que exista. Tiene IP pública pero sin redes autorizadas: la API se conecta "
+          + "solo por el conector de Cloud SQL de Cloud Run, por socket en /cloudsql.",
+        "- La API necesita estas variables: DATABASE_URL (URL de Prisma con host=/cloudsql/<nombre de conexión de la instancia>), "
+          + "COOKIE_SECURE con valor \"true\", INITIAL_ADMIN_USERNAME con valor \"admin\" e INITIAL_ADMIN_PASSWORD.",
+        "- DATABASE_URL y la contraseña del administrador se guardan en Secret Manager. Las contraseñas las escribo yo al desplegar.",
+        "- La dirección pública de la página web debe quedar en una salida llamada service_url.",
+      ].join("\n"),
     }];
   }
 
