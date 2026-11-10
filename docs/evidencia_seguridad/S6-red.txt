@@ -1,0 +1,39 @@
+S6 · El contenedor no sale a internet
+Fecha: 2026-11-05T13:39:12+00:00   Contenedor: be3280198c47   Usuario: uid=10001
+Proxy de salida: http://proxy:3128
+
+[OK] Conexión TCP directa a 1.1.1.1:443, sin proxy
+       esperado: rechazada
+       obtenido: OSError: [Errno 101] Network is unreachable
+[OK] Conexión TCP directa a 8.8.8.8:53, sin proxy
+       esperado: rechazada
+       obtenido: OSError: [Errno 101] Network is unreachable
+[OK] Conexión TCP directa a 142.250.0.1:443, sin proxy
+       esperado: rechazada
+       obtenido: OSError: [Errno 101] Network is unreachable
+(info) DNS directo de example.com: no resuelve ([Errno -3] Temporary failure in name resolution)
+
+[OK] HTTPS a un sitio cualquiera: https://example.com
+       esperado: rechazado por el proxy (403)
+       obtenido: rechazado: Tunnel connection failed: 403 Forbidden
+[OK] Registro de Terraform (otros proveedores): https://registry.terraform.io/v1/providers/hashicorp/aws/versions
+       esperado: rechazado por el proxy (403)
+       obtenido: rechazado: Tunnel connection failed: 403 Forbidden
+[OK] GitHub (módulos remotos): https://github.com
+       esperado: rechazado por el proxy (403)
+       obtenido: rechazado: Tunnel connection failed: 403 Forbidden
+[OK] Descargas de paquetes o scripts: https://raw.githubusercontent.com/BerriAI/litellm/main/README.md
+       esperado: rechazado por el proxy (403)
+       obtenido: rechazado: Tunnel connection failed: 403 Forbidden
+[OK] IP literal, sin nombre de dominio: https://8.8.8.8
+       esperado: rechazado por el proxy (403)
+       obtenido: rechazado: Tunnel connection failed: 403 Forbidden
+[OK] HTTP sin cifrar, aunque sea a un dominio permitido: http://storage.googleapis.com/
+       esperado: rechazado por el proxy (403)
+       obtenido: HTTP 403 del proxy (ERR_ACCESS_DENIED 0)
+
+[OK] Control: las APIs de Google sí pasan por el proxy (https://www.googleapis.com/discovery/v1/apis?name=storage&fields=kind)
+       esperado: responde el destino (Gemini y terraform plan siguen funcionando)
+       obtenido: HTTP 200 del destino
+
+Resultado: 10/10 comprobaciones dieron lo esperado

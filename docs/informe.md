@@ -242,15 +242,17 @@ Para garantizar reproducibilidad absoluta, el sandbox se empaqueta en una imagen
 | **Sistema Operativo Base** | Debian 13 (Trixie-slim) | `Dockerfile` (`FROM python:3.12.15-slim-trixie`) | Entorno de ejecución base mínimo y sin utilitarios innecesarios. |
 | **Terraform Core** | 1.16.7 | `Dockerfile` (`ARG TERRAFORM_VERSION=1.16.7`) | Motor de validación de sintaxis, inicialización y planificación. |
 | **Proveedor Google** | 8.8.1 | `Dockerfile` (`ARG GOOGLE_PROVIDER_VERSION=8.8.1`) | Proveedor principal precargado en espejo local (`filesystem_mirror`). |
-| **Proveedor Google-Beta** | 8.8.1 | `Dockerfile` (`ARG GOOGLE_PROVIDER_VERSION=8.8.1`) | Proveedor para características en vista previa (Cloud Run v2). |
+| **Proveedor Google-Beta** | 8.8.1 | `Dockerfile` (`ARG GOOGLE_PROVIDER_VERSION=8.8.1`) | Recursos y argumentos en beta; se precarga por si el código generado lo declara (Cloud Run v2 está en el proveedor `google`). |
 | **TFLint** | 0.65.0 | `Dockerfile` (`ARG TFLINT_VERSION=0.65.0`) | Linter estático para detección de sintaxis no óptima y tipos inválidos. |
 | **TFLint Ruleset Google** | 0.40.0 | `sandbox/.tflint.hcl` (`version = "0.40.0"`) | Conjunto de reglas semánticas oficiales para recursos de GCP. |
 | **Checkov** | 3.3.30 | `sandbox/requisitos/checkov.lock` | Escáner de seguridad y cumplimiento estático contra CIS Benchmarks. |
 | **Python** | 3.12.15 | `Dockerfile` / Runtime oficial | Lenguaje de implementación del agente, CLI e interfaz web. |
 | **LiteLLM** | 1.105.3 | `sandbox/requisitos/agente.lock` | Capa de abstracción para invocación de Gemini con cálculo de costos. |
 | **Pydantic** | 2.14.3 | `sandbox/requisitos/agente.lock` | Validación de esquemas estructurados de especificación y resultados. |
-| **Proxy Squid** | 6.10-1 | `sandbox/proxy/Dockerfile` | Proxy de salida con filtrado estricto de FQDNs autorizados. |
-| **Nginx Puente** | 1.27-alpine | `compose.yaml` (Fijado por Digest sha256) | Servidor proxy reverso local que publica la interfaz web en 127.0.0.1. |
+| **Proxy Squid** | 7.6 | `sandbox/proxy/Dockerfile` (`FROM alpine:3.24.3`) | Proxy de salida: solo túneles HTTPS hacia `*.googleapis.com` (y `*.run.app` en despliegue). |
+| **Nginx Puente** | 1.30.6-alpine | `compose.yaml` (`nginx-unprivileged`, fijado por digest sha256) | Proxy reverso que publica la interfaz web solo en 127.0.0.1. |
+
+Las versiones se verificaron dentro de la imagen construida (`docs/evidencia_seguridad/versiones.txt`).
 
 ---
 
@@ -469,19 +471,21 @@ La Tabla 5.7 evidencia que el agente IaC autónomo proporciona una **aceleració
 
 ### 5.8 EVALUACIÓN DE SEGURIDAD DEL SANDBOX: PRUEBAS S1 A S8
 
-La integridad y confinamiento del entorno de ejecución fueron evaluados mediante la batería de 8 pruebas de seguridad estandarizadas (S1 a S8). La Tabla 5.8 resume el resultado de cada control y el mecanismo de mitigación implementado.
+La contención del entorno de ejecución se evaluó con 8 pruebas de seguridad (S1 a S8). Siete están automatizadas en pytest y se ejecutan dentro del contenedor del sandbox con Terraform, TFLint y Checkov reales (`docker compose run --rm pruebas`): las 110 pruebas de la suite pasaron sobre el código congelado. S6 cuenta además con un script de evidencia de 10 comprobaciones, y S5 requiere las credenciales del proyecto. La Tabla 5.8 resume el resultado y el mecanismo de cada control; la evidencia está en `docs/evidencia_seguridad/`.
 
 #### Tabla 5.8: Resultados de la Batería de Pruebas de Seguridad del Sandbox (S1 a S8)
 | ID Control | Propósito y Amenaza Mitigada | Mecanismo de Defensa Implementado | Resultado de Prueba | Evidencia Asociada |
 | :---: | :--- | :--- | :---: | :--- |
-| **S1** | El modo evaluación no debe aplicar ni destruir infraestructura. | CLI desacoplado: comando `generar` carece de invocaciones a `apply` o `destroy`. | **PASÓ (OK)** | `pytest tests/test_deploy.py` |
-| **S2** | Rechazo de código de proveedores de nube ajenos a GCP. | Análisis estático de AST en `guard.py` y espejo local restrictivo en `terraform.rc`. | **PASÓ (OK)** | 12 pruebas en `test_sandbox.py` |
-| **S3** | Rechazo de ejecución local (`local-exec`) y lectura de archivos o secretos. | `guard.py` rechaza bloques `provisioner`, funciones `file()`, `templatefile()` y `data "external"`. | **PASÓ (OK)** | 16 pruebas en `test_sandbox.py` |
-| **S4** | Rechazo de peticiones HTTP no autorizadas desde Terraform. | `guard.py` bloquea fuentes de datos `http` y argumentos `endpoint` personalizados. | **PASÓ (OK)** | 11 pruebas en `test_sandbox.py` |
-| **S5** | La cuenta de evaluación Viewer no debe tener permisos de escritura. | Suplantación de Service Account con rol `roles/viewer`. Intento de crear bucket falla con 403. | **PASÓ (OK)** | `sandbox/pruebas_seguridad.py s5` |
-| **S6** | El contenedor no debe conectarse directamente a internet. | Red Docker interna aislada sin gateway; salida exclusiva por Squid a `*.googleapis.com`. | **PASÓ (OK)** | `sandbox/pruebas_seguridad.py s6` |
-| **S7** | Protección contra despliegues accidentales en producción. | Exigencia interactiva de confirmación humana con el ID exacto del proyecto GCP. | **PASÓ (OK)** | `test_deploy.py::test_sin_aprobacion` |
-| **S8** | Rechazo de planes con tipos fuera de catálogo o acciones destructivas. | Verificación programática del AST del plan en `deploy.py::verificar_plan`. | **PASÓ (OK)** | `test_deploy.py::test_verificar_plan` |
+| **S1** | El modo evaluación no aplica ni destruye infraestructura. | El ejecutor del modo evaluación (`sandbox/local_runner.py`) solo admite `init`, `fmt`, `validate`, `plan`, `show` y `version`; `apply`, `destroy`, `import` y `state` se rechazan con `ComandoNoPermitido`. Además, `plan` corre con la cuenta Viewer. | **PASÓ (1 prueba)** | `test_sandbox.py::test_ejecutor_de_evaluacion_no_permite_apply`; `pytest-contenedor.txt` |
+| **S2** | Rechazo de código de proveedores ajenos a GCP. | `guard.py` analiza la estructura del HCL y rechaza bloques `provider`, fuentes de `required_providers` y tipos de recurso que no sean de `google` o `google-beta`. Como segunda capa, Terraform solo instala proveedores desde el espejo local de la imagen (`sandbox/terraform.rc`). | **PASÓ (14 pruebas)** | 12 en `test_sandbox.py` y 2 en `test_contenedor.py::test_init_solo_instala_proveedores_del_espejo` |
+| **S3** | Rechazo de ejecución local y de lectura de archivos o credenciales. | `guard.py` rechaza `provisioner`, `connection`, `data "external"`, funciones que leen archivos (`file`, `templatefile`, `filebase64`…), `credentials` e `impersonate_service_account` en el provider, `data "google_client_config"` e `import`. La clave del LLM no se pasa a Terraform, TFLint ni Checkov. | **PASÓ (16 pruebas)** | `test_sandbox.py` |
+| **S4** | Rechazo de peticiones de red desde Terraform. | `guard.py` rechaza `data "http"`, `backend`, `cloud`, `terraform_remote_state`, módulos y endpoints personalizados del provider. | **PASÓ (11 pruebas)** | `test_sandbox.py` |
+| **S5** | La cuenta de evaluación (Viewer) no puede crear recursos. | `plan` suplanta una cuenta con `roles/viewer`. La prueba intenta crear un bucket con `terraform apply` usando esa cuenta y espera un error 403. | **PENDIENTE** | `S5-viewer.txt`, por generar con `python -m sandbox.pruebas_seguridad s5` (requiere las credenciales del proyecto) |
+| **S6** | El contenedor no se conecta a internet. | Red interna de Docker sin ruta a internet; la única salida es un proxy Squid que solo abre túneles HTTPS a `*.googleapis.com` (y a `*.run.app` en despliegue). | **PASÓ (6 pruebas y 10/10 comprobaciones)** | `S6-red.txt`, `S6-log-proxy.txt`, `test_contenedor.py` |
+| **S7** | Sin aprobación humana no hay `apply`. | Para aplicar el plan, el operador debe escribir el ID exacto del proyecto; cualquier otra respuesta cancela el despliegue. | **PASÓ (1 prueba)** | `test_deploy.py::test_sin_aprobacion_no_hay_apply` |
+| **S8** | Rechazo de planes con recursos fuera del catálogo o con destrucción. | `deploy.py::verificar_plan` revisa los cambios de `terraform show -json` y rechaza tipos fuera del catálogo y acciones de borrado o reemplazo, sin llegar a preguntar al operador. | **PASÓ (2 pruebas)** | `test_deploy.py::test_verificar_plan_rechaza_fuera_de_catalogo_y_destruccion` y `::test_plan_fuera_de_catalogo_no_pregunta` |
+
+S5 queda pendiente porque las credenciales del proyecto las administra un solo integrante. Al ejecutarse, el resultado y el archivo `S5-viewer.txt` reemplazan esta fila.
 
 ---
 
@@ -498,7 +502,7 @@ La comparación entre T0 y T1 ilustra con claridad que el conocimiento paramétr
 ### 6.2 CONCLUSIONES ESPECÍFICAS (C1 A C4)
 
 #### Conclusión C1: Seguridad del Sandbox y Confinamiento de Ejecución (Santiago Callocondo)
-Se demostró de forma concluyente que la arquitectura de contención multicapa (análisis sintáctico previo al inicio con `guard.py`, red interna de Docker sin salida directa a internet, proxy Squid con lista blanca estricta de dominios de Google Cloud, contenedores de solo lectura sin privilegios y suplantación de cuentas Viewer) neutraliza eficazmente todas las superficies de ataque identificadas (S1 a S8). Este diseño previene de raíz la inyección de código malicioso, la ejecución de scripts hostiles mediante `local-exec` y la fuga de credenciales corporativas, estableciendo un marco seguro para la adopción de agentes de IA en ingeniería de software.
+La arquitectura de contención por capas (revisión estructural del HCL con `guard.py` antes de `init`, espejo local de proveedores, red interna de Docker sin salida directa a internet, proxy Squid con lista blanca de dominios de Google Cloud, contenedores de solo lectura sin privilegios y suplantación de la cuenta Viewer) superó las pruebas automatizadas S1 a S4 y S6 a S8: el código generado no pudo usar otros proveedores, ejecutar comandos locales, leer archivos o credenciales del sandbox, salir a internet ni desplegar sin aprobación humana. Las capas se complementan: si la revisión estática dejara pasar un caso, el espejo de proveedores y la red siguen bloqueándolo. S5 (permisos de la cuenta Viewer) queda pendiente de evidencia. Persisten riesgos residuales: la credencial del operador se monta en el contenedor, las APIs de Google permitidas podrían usarse como canal de salida de datos y la revisión estática puede tener falsos negativos.
 
 #### Conclusión C2: Efectividad del Grounding y el Bucle T1 (Gabriel Llerena)
 La combinación de un catálogo de recursos curado junto con el índice del esquema real del proveedor `google` y el ciclo de retroalimentación de herramientas formales incrementó la tasa de éxito de validación del **38.9 % en T0 al 91.7 % en T1**, alcanzando un $100 \%$ de éxito en escenarios básicos y un $93.3 \%$ en intermedios. Las pruebas de significancia estadística de McNemar ($p = 3.64 \times 10^{-5}$) y Wilcoxon ($p < 0.0001$) confirman el rechazo categórico de la hipótesis nula, evidenciando que el bucle formal de reparación es determinante para transformar borradores alucinados en manifiestos de infraestructura completamente válidos.
