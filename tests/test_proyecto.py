@@ -100,7 +100,7 @@ def test_el_texto_para_el_agente_trae_lo_necesario_para_desplegar():
     t = ficha()["texto"]
     for esperado in (f"{REPO}/tienda-api:v1", "puerto 3000", "puerto 8080", "PostgreSQL 17", "base llamada tienda",
                      "API_URL: debe recibir la URL pública del componente api", "service_url", "/cloudsql",
-                     "URL de Prisma", "Secret Manager", "No declares la variable PORT",
+                     "URL de Prisma", "no la pidas como variable", "Secret Manager", "No declares la variable PORT",
                      "true en producción (https)"):
         assert esperado in t, esperado
 

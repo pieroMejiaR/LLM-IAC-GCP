@@ -236,6 +236,12 @@
     } catch (e) {
       estado.error = `No se pudo leer el estado del agente: ${e.message}`;
     }
+    // Enlace a una sesión (#sesion=<id>): permite reabrirla en otra pestaña o capturarla para el informe.
+    const enlace = /[#&]sesion=([0-9a-f]{16})/.exec(location.hash);
+    if (enlace) {
+      sessionStorage.setItem("sesion", enlace[1]);
+      history.replaceState(null, "", location.pathname);
+    }
     const guardada = sessionStorage.getItem("sesion");
     if (guardada) {
       try { estado.sesion = await api(`/api/sesiones/${guardada}`); } catch { sessionStorage.removeItem("sesion"); }
@@ -907,6 +913,7 @@
       if (/admin/.test(n)) return "Contraseña del administrador de la aplicación";
       return "Contraseña";
     }
+    if (/url|dsn|connection/.test(n)) return "Cadena de conexión completa; es mejor descartar y generar de nuevo";
     if (/api_?key|token|secret/.test(n)) return "Clave de acceso de un servicio externo";
     return "Valor que necesita el código";
   }

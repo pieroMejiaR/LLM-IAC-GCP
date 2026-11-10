@@ -308,9 +308,11 @@ def texto_para_requerimiento(f: dict) -> str:
             L.append("- Base de datos en Cloud SQL con la instancia más pequeña. Opción de menor costo: IP pública sin redes "
                      "autorizadas y conexión solo por el conector de Cloud SQL de Cloud Run (socket en /cloudsql). "
                      + ("DATABASE_URL es una URL de Prisma" if f["prisma"] else "La URL de conexión es de PostgreSQL")
-                     + " con host=/cloudsql/<nombre de conexión de la instancia>.")
+                     + " con host=/cloudsql/<nombre de conexión de la instancia>. Arma esa URL dentro del código, con el usuario, "
+                       "la contraseña (con urlencode), el nombre de la base y el connection_name de la instancia: no la pidas "
+                       "como variable, porque la persona no la conoce.")
         secretas = sorted({n for c in f["componentes"] for n in c["variables"] if info.get(n, {}).get("secreta") or _SECRETO.search(n)})
         if secretas:
-            L.append(f"- Las variables secretas ({', '.join(secretas)}) se guardan en Secret Manager; las contraseñas se reciben "
-                     "como variables sensibles, sin valor por defecto.")
+            L.append(f"- Las variables secretas ({', '.join(secretas)}) se guardan en Secret Manager. Como variables sensibles sin "
+                     "valor por defecto solo se piden contraseñas (la de la base de datos y las de la aplicación).")
     return "\n".join(L)
