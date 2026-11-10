@@ -539,6 +539,54 @@ details.hallazgos summary span { font-weight: 400; color: var(--grafito-3); }
   color: var(--grafito-3);
 }
 
+/* ------------------------------------------------------------------ despliegue */
+
+.formulario-despliegue { display: flex; flex-direction: column; gap: 12px; max-width: 620px; }
+.hoja-cuerpo .fila-texto { font-size: var(--t-1); color: var(--grafito-2); max-width: 72ch; }
+
+.campo-var { display: grid; gap: 4px; font-size: var(--t-1); color: var(--grafito-2); }
+.campo-linea {
+  width: 100%;
+  padding: 9px 12px;
+  background: #FFFFFF;
+  border: 1px solid var(--grafito-3);
+  border-radius: 3px;
+  font: 400 var(--t-1)/1.4 var(--codigo);
+}
+
+.datos { display: grid; gap: 6px; font-size: var(--t-1); }
+.datos div { display: grid; grid-template-columns: 170px 1fr; gap: 16px; }
+.datos dt { color: var(--grafito-3); }
+.datos dd { overflow-wrap: anywhere; }
+.datos a { color: var(--grafito); font-weight: 600; }
+.datos code { font-family: var(--codigo); font-size: var(--t-2); }
+
+.accion-crear { color: var(--paso-osc); font-weight: 600; }
+.tabla.cambios td:first-child { overflow-wrap: anywhere; font-family: var(--codigo); font-size: var(--t-2); }
+.tabla.cambios th:last-child, .tabla.cambios td:last-child { width: 110px; }
+
+.texto-plano {
+  margin: 10px 0 0;
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px 14px;
+  background: #FFFFFF;
+  border: 1px solid var(--trazo-fino);
+  font: 400 var(--t-2)/1.5 var(--codigo);
+  white-space: pre;
+}
+
+.progreso { display: flex; align-items: center; gap: 10px; color: var(--grafito-2); }
+.progreso::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--senal);
+  animation: latido 1.4s ease-in-out infinite;
+}
+
 /* ------------------------------------------------------------------ mesa vacía */
 
 .introduccion h2 { font: 600 var(--t3)/1.1 var(--letra-estrecha); }
@@ -611,6 +659,7 @@ details.hallazgos summary span { font-weight: 400; color: var(--grafito-3); }
   .hoja-estado { margin-left: 0; width: 100%; text-align: left; }
   .cajetin { width: 100%; }
   .cajetin dd { white-space: normal; overflow-wrap: anywhere; }
+  .datos div { grid-template-columns: 1fr; gap: 0; }
 }
 
 @media (max-width: 560px) {

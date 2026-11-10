@@ -70,14 +70,20 @@ docker compose run --rm despliegue desplegar casos/caso_real.yaml
 ### Interfaz web
 
 ```bash
-docker compose up -d web-puente         # abre http://127.0.0.1:8787 (otro puerto: WEB_PUERTO=9000 en .env)
-docker compose down                     # la apaga
-docker compose up -d --force-recreate web   # tras cambiar .env o hacer el login de ADC (la web lee la configuración al arrancar)
+docker compose up -d web-puente              # modo evaluación: http://127.0.0.1:8787 (otro puerto: WEB_PUERTO en .env)
+docker compose up -d web-puente-despliegue   # con despliegue:  http://127.0.0.1:8788 (WEB_DESPLIEGUE_PUERTO)
+docker compose down                          # las apaga
+docker compose up -d --force-recreate web web-despliegue   # tras cambiar .env o hacer el login de ADC (leen la configuración al arrancar)
 ```
 
-Es un chat del modo evaluación: la persona escribe el requerimiento, revisa la especificación (la aprueba o pide cambios, y cada ronda es una revisión A, B, C…), y el agente genera, valida y repara con el mismo bucle T1 del experimento (`Agente.iniciar`, `especificar` y `completar`, que también usa `correr`). Muestra la línea de controles de cada intento, los hallazgos de Checkov, el costo y los archivos, que se descargan en un `.zip`. **Nunca despliega**: el despliegue sigue en la terminal con `desplegar`.
+Es un chat: la persona escribe el requerimiento, revisa la especificación (la aprueba o pide cambios, y cada ronda es una revisión A, B, C…), y el agente genera, valida y repara con el mismo bucle T1 del experimento (`Agente.iniciar`, `especificar` y `completar`, que también usa `correr`). Muestra la línea de controles de cada intento, los hallazgos de Checkov, el costo y los archivos, que se descargan en un `.zip`.
 
-Las corridas de la interfaz se guardan en `resultados/web/`, fuera de los escenarios del experimento. El servidor usa solo la biblioteca estándar (`agent/web/servidor.py`), atiende un trabajo con el LLM a la vez, solo responde a `localhost` y del mismo origen, y la página inserta el texto del modelo con `textContent`. El servicio `web` queda en la red interna como el agente; `web-puente` (nginx sin privilegios, imagen fijada por digest, `sandbox/puente/nginx.conf`) es la única pieza con puerto publicado y no ejecuta código del agente.
+Hay dos servicios con la misma página:
+
+- **`web` (modo evaluación, puerto 8787). Nunca despliega**: no recibe un desplegador y sus rutas de despliegue responden 403. Usa la red y el proxy de evaluación y la cuenta Viewer.
+- **`web-despliegue` (puerto 8788)**, iniciado con `web --despliegue` en la red y con el proxy del modo despliegue. Si el código pasó todos los controles, incluido `plan` con la cuenta Viewer, la página ofrece desplegarlo con el mismo flujo de `desplegar` (`agent/deploy.py`, sin cambios en sus controles): pide las variables sin valor por defecto (contraseñas, que solo viven en memoria), calcula un plan guardado con la cuenta de despliegue, lo rechaza si trae recursos fuera del catálogo o acciones de borrado (S8), lo aplica solo si la persona escribe el ID del proyecto (S7), prueba `service_url` y pide una segunda confirmación para destruir. Sin respuesta en 30 minutos no se aplica nada. La evidencia queda en `resultados/web/<corrida>/evidencia/` y, si los recursos se conservan, se destruyen después con `docker compose run --rm despliegue destruir resultados/web/<corrida>/despliegue`.
+
+Las corridas de la interfaz se guardan en `resultados/web/`, fuera de los escenarios del experimento. El servidor usa solo la biblioteca estándar (`agent/web/servidor.py`), atiende un trabajo con el LLM a la vez, solo responde a `localhost` y del mismo origen, y la página inserta el texto del modelo con `textContent`. Los servicios `web` y `web-despliegue` quedan en sus redes internas, como el agente; los puentes `web-puente` y `web-puente-despliegue` (nginx sin privilegios, imagen fijada por digest, `sandbox/puente/`) son las únicas piezas con puerto publicado, solo en 127.0.0.1, y no ejecutan código del agente.
 
 | Capa | Qué hace |
 | --- | --- |

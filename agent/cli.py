@@ -124,13 +124,25 @@ def desplegar(
 def web(
     puerto: int = typer.Option(8000, help="Puerto del servidor"),
     salida: Path = typer.Option(Path("resultados/web"), help="Carpeta de resultados de la interfaz"),
+    despliegue: bool = typer.Option(False, "--despliegue", help="Permitir desplegar desde el chat; pide el ID "
+                                                                "del proyecto antes de apply y de destroy"),
 ) -> None:
-    """Interfaz web (chat) del modo evaluación: revisión de la especificación y descarga. Nunca despliega."""
+    """Interfaz web (chat): revisión de la especificación, validación y descarga. Sin --despliegue nunca despliega."""
     from agent.web.servidor import REGIONES, Aplicacion, crear_servidor
 
     cfg = Config.desde_entorno()
     agente = _componentes(cfg, simulado=False, sin_plan=False)
+    desplegadores = None
+    if despliegue:
+        if not (cfg.proyecto_gcp and cfg.cuenta_evaluacion and cfg.cuenta_despliegue):
+            raise typer.BadParameter("--despliegue requiere GCP_PROYECTO, GCP_CUENTA_EVALUACION y GCP_CUENTA_DESPLIEGUE")
+        from sandbox.local_runner import DesplegadorLocal
+
+        def desplegadores(directorio: Path, variables: dict[str, str]) -> DesplegadorLocal:
+            return DesplegadorLocal(cfg.proyecto_gcp, cfg.region, cfg.cuenta_despliegue, directorio, variables=variables)
     info = {
+        "despliegue": despliegue,
+        "proyecto": cfg.proyecto_gcp if despliegue else None,
         "modelo": cfg.modelo,
         "region": cfg.region if cfg.region in REGIONES else REGIONES[0],
         "regiones": list(REGIONES),
@@ -141,8 +153,12 @@ def web(
     # Dentro del contenedor escucha en todas las interfaces de la red interna (solo llega web-puente);
     # fuera de Docker, solo en localhost.
     host = "0.0.0.0" if os.environ.get("SANDBOX_CONTENEDOR") else "127.0.0.1"  # noqa: S104
-    servidor = crear_servidor(Aplicacion(agente, salida, info, _guardar), host, puerto)
-    typer.echo(f"Interfaz web escuchando en {host}:{puerto}. Con Docker: http://127.0.0.1:8787")
+    aplicacion = Aplicacion(agente, salida, info, _guardar, desplegadores=desplegadores,
+                            proyecto_id=cfg.proyecto_gcp if despliegue else None)
+    servidor = crear_servidor(aplicacion, host, puerto)
+    modo = "con despliegue (http://127.0.0.1:8788 con Docker)" if despliegue else \
+        "modo evaluación (http://127.0.0.1:8787 con Docker)"
+    typer.echo(f"Interfaz web escuchando en {host}:{puerto}, {modo}.")
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:

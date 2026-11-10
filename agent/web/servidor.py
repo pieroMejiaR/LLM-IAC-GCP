@@ -1,10 +1,17 @@
-"""Interfaz web (chat) del modo evaluación.
+"""Interfaz web (chat) del agente.
 
-    docker compose up -d web-puente        # luego abrir http://127.0.0.1:8787
+    docker compose up -d web-puente               # modo evaluación: http://127.0.0.1:8787
+    docker compose up -d web-puente-despliegue    # con despliegue:  http://127.0.0.1:8788
 
 La persona escribe el requerimiento, revisa la especificación (la aprueba o pide cambios) y el
 agente planifica, genera, valida y repara el Terraform con el mismo bucle T1 del experimento.
-Nunca despliega: el despliegue sigue en la terminal (`desplegar`), con sus dos confirmaciones.
+
+En modo evaluación (`web`) nunca despliega: no recibe un desplegador y no existe ningún camino
+hacia apply. Con `web --despliegue`, el código que pasó todos los controles se puede desplegar
+desde el chat con el flujo de agent.deploy, sin cambios en sus controles: plan guardado con la
+cuenta de despliegue, rechazo de recursos fuera del catálogo (S8), aprobación escribiendo el ID
+del proyecto (S7), apply de ese plan, prueba HTTP y destrucción con una segunda confirmación.
+Las contraseñas que pide el plan solo viven en memoria.
 
 Usa solo la biblioteca estándar, para no tocar las dependencias fijadas con hashes. Las
 operaciones largas corren en un hilo y el navegador consulta el estado cada segundo. Hay un
@@ -29,9 +36,16 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import urlsplit
 
+from agent.deploy import ResultadoDespliegue, ejecutar_despliegue
 from agent.pipeline import Agente
 from agent.schemas import Escenario, ResultadoCorrida
+from sandbox.contract import Desplegador
+from sandbox.guard import variables_sin_valor
 
+ESPERA_CONFIRMACION_S = 30 * 60     # sin respuesta en ese tiempo: no se aplica (o se conservan los recursos)
+MAX_VALOR_VARIABLE = 256
+MAX_PLAN_TEXTO = 60_000
+_VARIABLES_DEL_SANDBOX = ("project_id", "region")
 MAX_REQUERIMIENTO = 4000
 MAX_CORRECCION = 2000
 MAX_CUERPO = 64 * 1024
@@ -61,10 +75,27 @@ class ErrorPeticion(Exception):
 
 
 @dataclass
+class Despliegue:
+    """Un despliegue iniciado desde el chat. El flujo y sus controles son los de agent.deploy."""
+    evidencia: str
+    res: ResultadoDespliegue = field(default_factory=ResultadoDespliegue)
+    # planificando, esperando_aprobacion, aplicando, esperando_destruccion, destruyendo, terminado
+    fase: str = "planificando"
+    pregunta: str | None = None
+    respuesta: str = ""
+    evento: threading.Event = field(default_factory=threading.Event)
+    desde: float = field(default_factory=time.time)
+
+    def pasar_a(self, fase: str) -> None:
+        self.fase, self.desde = fase, time.time()
+
+
+@dataclass
 class Sesion:
     id: str
     escenario: Escenario
     res: ResultadoCorrida
+    despliegue: Despliegue | None = None
     estado: str = "analizando"      # analizando, revision, generando, terminado, error
     error: str | None = None        # error que termina la sesión
     aviso: str | None = None        # error recuperable (una corrección que no se pudo aplicar)
@@ -77,13 +108,23 @@ class Sesion:
 
 class Aplicacion:
     def __init__(self, agente: Agente, salida: Path, info: dict,
-                 guardar: Callable[[ResultadoCorrida, Path], Path]) -> None:
+                 guardar: Callable[[ResultadoCorrida, Path], Path], *,
+                 desplegadores: Callable[[Path, dict[str, str]], Desplegador] | None = None,
+                 proyecto_id: str | None = None,
+                 probar: Callable[[str], dict] | None = None,
+                 espera_confirmacion_s: float = ESPERA_CONFIRMACION_S) -> None:
         self.agente = agente
         self.salida = Path(salida)
         self.info = info
         self.guardar = guardar
+        # Sin `desplegadores` (modo evaluación) no existe ningún camino hacia apply.
+        self.desplegadores = desplegadores if proyecto_id else None
+        self.proyecto_id = proyecto_id
+        self.probar = probar
+        self.espera_confirmacion_s = espera_confirmacion_s
         self.sesiones: dict[str, Sesion] = {}
         self.ocupado = threading.Lock()   # un trabajo con el LLM a la vez
+        self.desplegando = threading.Lock()   # un despliegue a la vez
         self.mutex = threading.Lock()     # protege el diccionario de sesiones
 
     # ------------------------------------------------------------------ acciones
@@ -190,10 +231,151 @@ class Aplicacion:
         sesion.estado = "terminado"
         sesion.eventos.append({"autor": "agente", "tipo": "resultado"})
 
+    # ------------------------------------------------------------------ despliegue (solo con --despliegue)
+
+    def variables_requeridas(self, sesion: Sesion) -> list[str]:
+        """Variables sin default (contraseñas, claves): quien despliega escribe su valor."""
+        return [n for n in variables_sin_valor(sesion.res.archivos) if n not in _VARIABLES_DEL_SANDBOX]
+
+    def _motivo_no_desplegable(self, sesion: Sesion) -> str | None:
+        res = sesion.res
+        if self.desplegadores is None:
+            return "Esta interfaz está en modo evaluación y no despliega."
+        if sesion.estado != "terminado" or not sesion.carpeta:
+            return "Todavía no hay código validado."
+        if not (res.validate_ok and res.validacion and res.validacion.ok):
+            return "El código no pasó todos los controles; no se puede desplegar."
+        if not res.plan_ok:
+            return "El plan del modo evaluación no se ejecutó; no se puede desplegar sin esa verificación."
+        d = sesion.despliegue
+        if d is not None and d.fase != "terminado":
+            return "Ya hay un despliegue en curso para este código."
+        if d is not None and d.res.aplicado:
+            return "Este código ya se aplicó una vez. Para desplegar de nuevo, inicie un requerimiento nuevo."
+        return None
+
+    def desplegar(self, sid: str, variables: object) -> Sesion:
+        """Prepara el plan con la cuenta de despliegue. No aplica nada: eso exige la confirmación."""
+        sesion = self.obtener(sid)
+        if self.desplegadores is None:
+            raise ErrorPeticion(HTTPStatus.FORBIDDEN, "Esta interfaz está en modo evaluación y no despliega.")
+        motivo = self._motivo_no_desplegable(sesion)
+        if motivo:
+            raise ErrorPeticion(HTTPStatus.CONFLICT, motivo)
+        valores: dict[str, str] = {}
+        for nombre in self.variables_requeridas(sesion):
+            valor = variables.get(nombre) if isinstance(variables, dict) else None
+            if not isinstance(valor, str) or not valor:
+                raise ErrorPeticion(HTTPStatus.BAD_REQUEST, f"Falta el valor de la variable {nombre}.")
+            if len(valor) > MAX_VALOR_VARIABLE:
+                raise ErrorPeticion(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, f"El valor de {nombre} es demasiado largo.")
+            valores[nombre] = valor
+        if not self.desplegando.acquire(blocking=False):
+            raise ErrorPeticion(HTTPStatus.CONFLICT, "Hay otro despliegue en curso; espere a que termine.")
+
+        carpeta = Path(sesion.carpeta)
+        d = Despliegue(evidencia=str(carpeta / "evidencia"))
+        sesion.despliegue = d
+        sesion.eventos.append({"autor": "usted", "tipo": "despliegue_solicitado"})
+        try:
+            # Los valores quedan solo en memoria, dentro del desplegador; no se guardan ni se devuelven.
+            desplegador = self.desplegadores(carpeta / "despliegue", valores)
+        except Exception:
+            self.desplegando.release()
+            sesion.despliegue = None
+            sesion.eventos.pop()
+            raise
+        preguntas = 0
+
+        def confirmar(mensaje: str) -> str:
+            nonlocal preguntas
+            preguntas += 1
+            d.evento.clear()
+            d.respuesta, d.pregunta = "", mensaje
+            if preguntas == 1:
+                d.pasar_a("esperando_aprobacion")
+                sesion.eventos.append({"autor": "agente", "tipo": "plan_listo", "recursos": len(d.res.cambios)})
+            else:
+                d.pasar_a("esperando_destruccion")
+                sesion.eventos.append({"autor": "agente", "tipo": "pregunta_destruir", "estado": d.res.estado,
+                                       "codigo": d.res.prueba_http.get("codigo")})
+            respondio = d.evento.wait(self.espera_confirmacion_s)
+            respuesta = d.respuesta if respondio else ""
+            d.respuesta, d.pregunta = "", None
+            if not respondio:   # sin respuesta a tiempo: equivale a no confirmar
+                d.pasar_a("cerrando")
+            return respuesta
+
+        def correr() -> None:
+            try:
+                extra = {"probar": self.probar} if self.probar else {}
+                ejecutar_despliegue(sesion.res.archivos, desplegador, proyecto_id=self.proyecto_id,
+                                    tipos_permitidos=self.agente.catalogo.tipos_permitidos, confirmar=confirmar,
+                                    dir_evidencia=carpeta / "evidencia", resultado=d.res, **extra)
+            except Exception as e:  # noqa: BLE001 - se muestra en la interfaz
+                d.res.estado, d.res.motivo = "error", f"{type(e).__name__}: {e}"[:600]
+            finally:
+                d.pregunta = None
+                sesion.eventos.append({"autor": "agente", "tipo": "despliegue", "estado": d.res.estado,
+                                       "motivo": d.res.motivo})
+                d.pasar_a("terminado")
+                self.desplegando.release()
+
+        threading.Thread(target=correr, name=f"despliegue-{sesion.id}", daemon=True).start()
+        return sesion
+
+    def confirmar_despliegue(self, sid: str, texto: str) -> Sesion:
+        """Entrega al flujo lo que escribió la persona. Quien decide si coincide es agent.deploy."""
+        sesion = self.obtener(sid)
+        d = sesion.despliegue
+        texto = (texto or "").strip()[:200]
+        coincide = texto == self.proyecto_id
+        with self.mutex:
+            if d is None or d.fase not in ("esperando_aprobacion", "esperando_destruccion"):
+                raise ErrorPeticion(HTTPStatus.CONFLICT, "El despliegue no está esperando una confirmación.")
+            sobre_plan = d.fase == "esperando_aprobacion"
+            # La fase solo informa a la página; la decisión la toma agent.deploy al comparar el texto.
+            d.pasar_a(("aplicando" if sobre_plan else "destruyendo") if coincide else "cerrando")
+        sesion.eventos.append({"autor": "usted", "tipo": "confirmacion",
+                               "sobre": "plan" if sobre_plan else "destruccion", "coincide": coincide})
+        d.respuesta = texto
+        d.evento.set()
+        return sesion
+
+    def _vista_despliegue(self, sesion: Sesion) -> dict:
+        habilitado = self.desplegadores is not None
+        motivo = self._motivo_no_desplegable(sesion)
+        v: dict = {
+            "habilitado": habilitado,
+            "proyecto": self.proyecto_id if habilitado else None,
+            "desplegable": motivo is None,
+            "motivo": motivo,
+            "variables": self.variables_requeridas(sesion) if habilitado and sesion.estado == "terminado" else [],
+            "actual": None,
+        }
+        d = sesion.despliegue
+        if d is not None:
+            r = d.res
+            actual = {
+                "fase": d.fase, "segundos": round(time.time() - d.desde), "pregunta": d.pregunta,
+                "estado": r.estado, "motivo": r.motivo, "cambios": list(r.cambios),
+                "aprobado": r.aprobado, "aplicado": r.aplicado, "destruido": r.destruido,
+                "prueba_http": dict(r.prueba_http), "duraciones_s": dict(r.duraciones_s),
+                "directorio": r.directorio, "evidencia": d.evidencia,
+            }
+            if d.fase == "esperando_aprobacion":
+                try:   # terraform show oculta los valores sensibles del plan
+                    actual["plan_texto"] = (Path(d.evidencia) / "plan.txt").read_text(encoding="utf-8")[:MAX_PLAN_TEXTO]
+                except OSError:
+                    actual["plan_texto"] = ""
+            v["actual"] = actual
+        return v
+
     def _podar(self) -> None:
         if len(self.sesiones) <= MAX_SESIONES:
             return
-        quietas = sorted((s for s in self.sesiones.values() if s.estado not in ("analizando", "generando")),
+        quietas = sorted((s for s in self.sesiones.values() if s.estado not in ("analizando", "generando")
+                          and (s.despliegue is None or s.despliegue.fase == "terminado")),
                          key=lambda s: s.creada)
         for s in quietas[: len(self.sesiones) - MAX_SESIONES]:
             del self.sesiones[s.id]
@@ -229,6 +411,7 @@ class Aplicacion:
             "tiempo_s": round(res.tiempo_s, 1),
             "carpeta": sesion.carpeta,
             "resultado": self._resultado(res) if sesion.estado == "terminado" else None,
+            "despliegue": self._vista_despliegue(sesion),
         }
         return d
 
@@ -336,6 +519,12 @@ class Manejador(BaseHTTPRequestHandler):
             return self._json(self.app.vista(s), HTTPStatus.ACCEPTED)
         if m := re.fullmatch(rf"/api/sesiones/{_ID}/correcciones", ruta):
             s = self.app.corregir(m.group(1), str(cuerpo.get("texto", "")))
+            return self._json(self.app.vista(s), HTTPStatus.ACCEPTED)
+        if m := re.fullmatch(rf"/api/sesiones/{_ID}/despliegue", ruta):
+            return self._json(self.app.vista(self.app.desplegar(m.group(1), cuerpo.get("variables"))),
+                              HTTPStatus.ACCEPTED)
+        if m := re.fullmatch(rf"/api/sesiones/{_ID}/despliegue/confirmacion", ruta):
+            s = self.app.confirmar_despliegue(m.group(1), str(cuerpo.get("texto", "")))
             return self._json(self.app.vista(s), HTTPStatus.ACCEPTED)
         if m := re.fullmatch(rf"/api/sesiones/{_ID}/aprobar", ruta):
             return self._json(self.app.vista(self.app.aprobar(m.group(1))), HTTPStatus.ACCEPTED)

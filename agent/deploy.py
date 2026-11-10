@@ -1,7 +1,8 @@
 """Modo despliegue: el agente aplica un plan solo con aprobación humana.
 
 Controles (sección 4.2 del informe):
-1. Activación explícita: solo se llega aquí con el comando `desplegar`.
+1. Activación explícita: solo se llega aquí con el comando `desplegar` o desde la interfaz web
+   iniciada con `web --despliegue`; la interfaz del modo evaluación no tiene este camino.
 2. Recursos permitidos: el plan se rechaza si trae tipos fuera del catálogo o
    acciones de destrucción o reemplazo (prueba S8).
 3. Aprobación humana: la persona debe escribir el ID del proyecto (prueba S7).
@@ -105,10 +106,12 @@ def ejecutar_despliegue(
     confirmar: Callable[[str], str],
     dir_evidencia: Path,
     probar: Callable[[str], dict] = prueba_http,
+    resultado: ResultadoDespliegue | None = None,
 ) -> ResultadoDespliegue:
+    """`resultado` permite a quien llama (la interfaz web) leer el avance mientras el flujo corre."""
     dir_evidencia = Path(dir_evidencia)
     dir_evidencia.mkdir(parents=True, exist_ok=True)
-    res = ResultadoDespliegue()
+    res = resultado if resultado is not None else ResultadoDespliegue()
 
     def guardar(nombre: str, texto: str) -> None:
         (dir_evidencia / nombre).write_text(texto, encoding="utf-8")

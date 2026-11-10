@@ -17,7 +17,8 @@ from agent.llm import ClienteLLM
 from agent.pipeline import Agente
 from agent.web.servidor import REGIONES, Aplicacion, crear_servidor
 from grounding.catalog import Catalogo
-from sandbox.fake import ValidadorSimulado, resultado_error, resultado_ok
+from sandbox.contract import CambioRecurso
+from sandbox.fake import DesplegadorSimulado, ValidadorSimulado, resultado_error, resultado_ok
 
 REQ = "Necesitamos un sitio web estático público y barato en Santiago de Chile."
 SPEC_A = {"proyecto": "sitio", "region": "southamerica-west1",
@@ -28,6 +29,10 @@ SPEC_B = {"proyecto": "sitio", "region": "southamerica-west1",
 CODIGO = '<file name="main.tf">\nresource "google_storage_bucket" "sitio" {\n  name = "x"\n}\n</file>'
 CODIGO_OK = ('<file name="main.tf">\nresource "google_storage_bucket" "sitio" {\n  name = "x"\n}\n'
              'resource "google_storage_bucket_iam_member" "p" {\n  bucket = "x"\n}\n</file>')
+CODIGO_CON_SECRETO = CODIGO_OK + ('\n<file name="variables.tf">\nvariable "db_password" {\n  type      = string\n'
+                                  '  sensitive = true\n}\n</file>')
+PROYECTO = "mi-proyecto"
+CAMBIOS = [CambioRecurso(direccion="google_storage_bucket.sitio", tipo="google_storage_bucket", acciones=["create"])]
 
 
 class Guion:
@@ -51,13 +56,20 @@ class Guion:
 def web(tmp_path):
     servidores = []
 
-    def levantar(respuestas, validador=None, bloqueo=None):
+    def levantar(respuestas, validador=None, bloqueo=None, desplegador=None, espera_confirmacion_s=5):
         fn = Guion(respuestas, bloqueo)
         llm = ClienteLLM("gemini/gemini-3.8-flash", 0.75, 3.75, completion_fn=fn, espera_s=0)
         agente = Agente(llm, validador or ValidadorSimulado(), Catalogo.cargar(), Config())
         info = {"modelo": "gemini/gemini-3.8-flash", "region": REGIONES[0], "regiones": list(REGIONES),
                 "plan": False, "max_reparaciones": 5}
-        srv = crear_servidor(Aplicacion(agente, tmp_path / "web", info, _guardar), "127.0.0.1", 0)
+        extra = {}
+        if desplegador is not None:   # como `web --despliegue`
+            def fabrica(directorio, variables):
+                desplegador.variables_recibidas = dict(variables)
+                return desplegador
+            extra = {"desplegadores": fabrica, "proyecto_id": PROYECTO, "espera_confirmacion_s": espera_confirmacion_s,
+                     "probar": lambda url: {"url": url, "codigo": 200, "latencia_ms": 5, "intentos": 1, "ok": True}}
+        srv = crear_servidor(Aplicacion(agente, tmp_path / "web", info, _guardar, **extra), "127.0.0.1", 0)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         servidores.append(srv)
         return f"http://127.0.0.1:{srv.server_address[1]}", fn
@@ -187,3 +199,126 @@ def test_pagina_y_cabeceras_de_seguridad(web):
 def test_la_pagina_no_inserta_html_del_modelo():
     js = resources.files("agent.web").joinpath("estatico", "app.js").read_text(encoding="utf-8")
     assert "innerHTML" not in js.replace("nunca con innerHTML", "") and "insertAdjacentHTML" not in js
+
+
+# ---------------------------------------------------------------------- despliegue desde el chat
+
+
+def esperar_fase(base, sid, *fases):
+    limite = time.monotonic() + 5
+    while time.monotonic() < limite:
+        v = vista(base, sid)
+        actual = v["despliegue"]["actual"]
+        if actual and actual["fase"] in fases:
+            return v
+        time.sleep(0.02)
+    raise AssertionError(f"El despliegue no llegó a {fases}: {actual}")
+
+
+def sesion_terminada(base, codigo=CODIGO_OK):
+    _, _, cuerpo = pedir(f"{base}/api/sesiones", {"requerimiento": REQ, "region": REGIONES[0]})
+    sid = json.loads(cuerpo)["id"]
+    esperar(base, sid, "revision")
+    assert pedir(f"{base}/api/sesiones/{sid}/aprobar", {})[0] == 202
+    esperar(base, sid, "terminado")
+    return sid
+
+
+def test_modo_evaluacion_no_tiene_camino_de_despliegue(web):
+    """Sin `--despliegue`, la interfaz no puede planificar ni aplicar nada."""
+    base, _ = web([json.dumps(SPEC_A), CODIGO_OK])
+    sid = sesion_terminada(base)
+    v = vista(base, sid)
+    assert v["despliegue"]["habilitado"] is False and v["despliegue"]["proyecto"] is None
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue", {"variables": {}})[0] == 403
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue/confirmacion", {"texto": PROYECTO})[0] == 409
+
+
+def test_despliegue_desde_el_chat_exige_el_id_del_proyecto(web, tmp_path):
+    """S7 en la interfaz: sin el ID exacto del proyecto no hay apply; con él, se aplica y se prueba."""
+    d = DesplegadorSimulado(CAMBIOS, {"service_url": "https://app.run.app"})
+    base, _ = web([json.dumps(SPEC_A), CODIGO_CON_SECRETO], desplegador=d)
+    sid = sesion_terminada(base)
+    v = vista(base, sid)
+    assert v["despliegue"]["desplegable"] and v["despliegue"]["variables"] == ["db_password"]
+
+    # El plan pide la contraseña; no se devuelve en ninguna respuesta ni se guarda en disco.
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue", {"variables": {}})[0] == 400
+    estado, _, cuerpo = pedir(f"{base}/api/sesiones/{sid}/despliegue", {"variables": {"db_password": "Clave-Secreta-91"}})
+    assert estado == 202 and b"Clave-Secreta-91" not in cuerpo
+    v = esperar_fase(base, sid, "esperando_aprobacion")
+    assert d.variables_recibidas == {"db_password": "Clave-Secreta-91"}
+    assert v["despliegue"]["actual"]["cambios"][0]["direccion"] == "google_storage_bucket.sitio"
+    assert PROYECTO in v["despliegue"]["actual"]["pregunta"] and "Clave-Secreta-91" not in json.dumps(v)
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue", {"variables": {"db_password": "x"}})[0] == 409
+
+    # Respuesta distinta del ID del proyecto: se cancela sin aplicar.
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue/confirmacion", {"texto": "si"})[0] == 202
+    v = esperar_fase(base, sid, "terminado")
+    assert v["despliegue"]["actual"]["estado"] == "cancelado" and not d.aplicado
+
+    # Segundo intento: con el ID exacto se aplica el plan y se prueba la URL.
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue", {"variables": {"db_password": "Clave-Secreta-91"}})[0] == 202
+    esperar_fase(base, sid, "esperando_aprobacion")
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue/confirmacion", {"texto": PROYECTO})[0] == 202
+    v = esperar_fase(base, sid, "esperando_destruccion")
+    actual = v["despliegue"]["actual"]
+    assert d.aplicado and actual["estado"] == "desplegado" and actual["prueba_http"]["codigo"] == 200
+
+    # Destruir exige una segunda confirmación; vacío conserva los recursos.
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue/confirmacion", {"texto": ""})[0] == 202
+    v = esperar_fase(base, sid, "terminado")
+    assert v["despliegue"]["actual"]["estado"] == "desplegado" and not d.destruido
+    assert not v["despliegue"]["desplegable"]   # no se aplica dos veces el mismo código
+    evidencia = Path(v["despliegue"]["actual"]["evidencia"])
+    assert evidencia.parent == Path(v["carpeta"])
+    for archivo in ("plan.txt", "apply.log", "http.txt", "resultado_despliegue.json"):
+        assert (evidencia / archivo).exists()
+    assert all("Clave-Secreta-91" not in p.read_text(encoding="utf-8") for p in (tmp_path / "web").rglob("*") if p.is_file())
+    tipos = [e["tipo"] for e in v["eventos"]]
+    assert tipos[-10:] == ["despliegue_solicitado", "plan_listo", "confirmacion", "despliegue",
+                           "despliegue_solicitado", "plan_listo", "confirmacion", "pregunta_destruir",
+                           "confirmacion", "despliegue"]
+
+
+def test_despliegue_destruye_con_segunda_confirmacion_y_vence_sin_respuesta(web):
+    d = DesplegadorSimulado(CAMBIOS, {"service_url": "https://app.run.app"})
+    base, _ = web([json.dumps(SPEC_A), CODIGO_OK, json.dumps(SPEC_A), CODIGO_OK], desplegador=d, espera_confirmacion_s=1.0)
+    sid = sesion_terminada(base)
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue", {"variables": {}})[0] == 202
+    esperar_fase(base, sid, "esperando_aprobacion")
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue/confirmacion", {"texto": PROYECTO})[0] == 202
+    esperar_fase(base, sid, "esperando_destruccion")
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue/confirmacion", {"texto": PROYECTO})[0] == 202
+    v = esperar_fase(base, sid, "terminado")
+    assert v["despliegue"]["actual"]["estado"] == "destruido" and d.destruido
+
+    # Otra sesión: si nadie responde a tiempo, el plan no se aplica.
+    d.aplicado = False
+    sid2 = sesion_terminada(base)
+    assert pedir(f"{base}/api/sesiones/{sid2}/despliegue", {"variables": {}})[0] == 202
+    v = esperar_fase(base, sid2, "terminado")
+    assert v["despliegue"]["actual"]["estado"] == "cancelado" and not d.aplicado
+
+
+def test_despliegue_rechaza_plan_fuera_del_catalogo_sin_preguntar(web):
+    """S8 en la interfaz: un plan con recursos fuera del catálogo nunca llega a pedir aprobación."""
+    malos = [CambioRecurso(direccion="google_compute_instance.vm", tipo="google_compute_instance", acciones=["create"])]
+    d = DesplegadorSimulado(malos)
+    base, _ = web([json.dumps(SPEC_A), CODIGO_OK], desplegador=d)
+    sid = sesion_terminada(base)
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue", {"variables": {}})[0] == 202
+    v = esperar_fase(base, sid, "terminado")
+    actual = v["despliegue"]["actual"]
+    assert actual["estado"] == "rechazado" and "google_compute_instance" in actual["motivo"] and not d.aplicado
+    assert "plan_listo" not in [e["tipo"] for e in v["eventos"]]
+
+
+def test_no_se_despliega_codigo_que_no_paso_los_controles(web):
+    validador = ValidadorSimulado(regla=lambda a: resultado_error(a, "validate", "Invalid block"))
+    d = DesplegadorSimulado(CAMBIOS)
+    base, _ = web([json.dumps(SPEC_A)] + [CODIGO] * 6, validador, desplegador=d)
+    sid = sesion_terminada(base)
+    v = vista(base, sid)
+    assert not v["despliegue"]["desplegable"] and "controles" in v["despliegue"]["motivo"]
+    assert pedir(f"{base}/api/sesiones/{sid}/despliegue", {"variables": {}})[0] == 409

@@ -27,7 +27,51 @@
   const MAX_REQUERIMIENTO = 4000;
   const MAX_CORRECCION = 2000;
 
-  const estado = { info: null, sesion: null, archivo: null, sondeo: null, error: null, enviando: false, firma: "" };
+  // Despliegue (solo si el servidor se inició con --despliegue)
+  const FASES_ACTIVAS = ["planificando", "aplicando", "destruyendo", "cerrando"];
+  const TEXTO_FASE = {
+    planificando: "Calculando el plan con la cuenta de despliegue",
+    aplicando: "Aplicando el plan aprobado; Cloud SQL puede tardar unos diez minutos",
+    destruyendo: "Destruyendo los recursos",
+    cerrando: "Cerrando el despliegue",
+  };
+  const ESTADO_DESPLIEGUE = {
+    desplegado: "Desplegado; los recursos se conservan",
+    destruido: "Desplegado, probado y destruido",
+    cancelado: "Cancelado: el plan no se aplicó",
+    rechazado: "Plan rechazado por la revisión automática",
+    fallo_plan: "Falló el plan con la cuenta de despliegue",
+    fallo_apply: "Falló el apply",
+    error: "Error inesperado",
+  };
+  const despliegueDe = (s) => (s && s.despliegue && s.despliegue.actual) || null;
+  const despliegueActivo = (s) => { const a = despliegueDe(s); return !!a && FASES_ACTIVAS.includes(a.fase); };
+  const despliegueAbierto = (s) => { const a = despliegueDe(s); return !!a && a.fase !== "terminado"; };
+
+  function ejemplos() {
+    const i = estado.info;
+    if (!i || !i.despliegue || !i.proyecto) return EJEMPLOS;
+    const repo = `southamerica-west1-docker.pkg.dev/${i.proyecto}/apps`;
+    return [...EJEMPLOS, {
+      etiqueta: "Caso real: sistema de pedidos de una picantería, con dos servicios de Cloud Run, Cloud SQL y secretos.",
+      texto: "Necesitamos desplegar en Google Cloud el sistema de pedidos de nuestra picantería. Son dos contenedores ya "
+        + `publicados en Artifact Registry: la API en ${repo}/picanteria-api:v1 y la web en ${repo}/picanteria-web:v1. `
+        + "La API (NestJS) escucha en el puerto 3000. La web (nginx) escucha en el puerto 80 y reenvía las rutas /api y "
+        + "/socket.io a la API, cuya URL recibe en la variable de entorno API_URL. Los dos servicios deben ser accesibles "
+        + "públicamente por HTTPS. La API usa PostgreSQL 17 con una base de datos llamada picanteria y un usuario picanteria. "
+        + "La instancia se llama picanteria-db-1107 y debe ser la más pequeña y barata posible, con IP pública pero sin redes "
+        + "autorizadas: la API se conecta solo mediante el conector de Cloud SQL de Cloud Run, por socket en /cloudsql. "
+        + "La API recibe estas variables de entorno: DATABASE_URL (URL de Prisma con host=/cloudsql/<nombre de conexión de la "
+        + "instancia>), COOKIE_SECURE con valor \"true\", INITIAL_ADMIN_USERNAME con valor \"admin\" e INITIAL_ADMIN_PASSWORD. "
+        + "La URL de la base de datos y la contraseña del administrador se guardan en Secret Manager; las contraseñas se "
+        + "reciben como variables sensibles. Los dos servicios usan una cuenta de servicio propia con permisos mínimos. "
+        + "La URL pública de la web se exporta con el nombre service_url. Región: Santiago de Chile. Debe ser lo más barato "
+        + "posible y poder destruirse por completo.",
+    }];
+  }
+
+  const estado = { info: null, sesion: null, archivo: null, sondeo: null, error: null, enviando: false, firma: "",
+    borradores: {}, borradorId: "", errorDespliegue: null };
 
   // ---------------------------------------------------------------- utilidades
 
@@ -92,7 +136,10 @@
   function sondear() {
     clearTimeout(estado.sondeo);
     const s = estado.sesion;
-    if (!s || !EN_CURSO.includes(s.estado)) return;
+    // Mientras el despliegue espera una confirmación no se consulta: la página no cambia sola
+    // y volver a dibujarla borraría lo que la persona está escribiendo.
+    const generando = !!s && EN_CURSO.includes(s.estado);
+    if (!generando && !despliegueActivo(s)) return;
     estado.sondeo = setTimeout(async () => {
       try {
         aplicar(await api(`/api/sesiones/${s.id}`));
@@ -109,7 +156,7 @@
         render();
         estado.sondeo = setTimeout(sondear, 3000);
       }
-    }, 1000);
+    }, generando ? 1000 : 2000);
   }
 
   async function enviar(accion) {
@@ -120,6 +167,10 @@
     try {
       aplicar(await accion());
     } catch (e) {
+      // 409: el estado cambió en el servidor (por ejemplo, venció la espera de una confirmación).
+      if (e.estado === 409 && estado.sesion) {
+        try { aplicar(await api(`/api/sesiones/${estado.sesion.id}`)); } catch { /* se muestra el error original */ }
+      }
       estado.error = e.message;
     } finally {
       estado.enviando = false;
@@ -133,6 +184,9 @@
     estado.sesion = null;
     estado.archivo = null;
     estado.error = null;
+    estado.borradores = {};
+    estado.borradorId = "";
+    estado.errorDespliegue = null;
     render();
     const campo = document.getElementById("campo-requerimiento");
     if (campo) campo.focus();
@@ -179,12 +233,20 @@
         el("div", { class: "autor", text: "Agente" }),
         el("div", { class: "texto", text: `${s.etapa || "Trabajando"}…` })));
     }
-    const firma = JSON.stringify([s.id, s.eventos.length, s.estado, s.etapa]);
+    const a = despliegueDe(s);
+    if (despliegueActivo(s)) {
+      entradas.push(el("div", { class: "entrada agente en-curso" },
+        el("div", { class: "autor", text: "Agente" }),
+        el("div", { class: "texto", text: `${TEXTO_FASE[a.fase]}…` })));
+    }
+    const firma = JSON.stringify([s.id, s.eventos.length, s.estado, s.etapa, a && a.fase]);
     if (firma === estado.firma) return false;
     const abajo = registro.scrollHeight - registro.scrollTop - registro.clientHeight < 60;
+    const hayNuevos = s.eventos.length !== estado.eventosVistos;   // un mensaje nuevo siempre se muestra
+    estado.eventosVistos = s.eventos.length;
     registro.replaceChildren(...entradas);
     estado.firma = firma;
-    return abajo || entradas.length <= 2;
+    return abajo || hayNuevos || entradas.length <= 2;
   }
 
   function entrada(ev, s) {
@@ -216,6 +278,33 @@
         clase += " mal";
       }
     }
+    if (ev.tipo === "despliegue_solicitado") texto = "Prepare el plan de despliegue.";
+    if (ev.tipo === "plan_listo") {
+      texto = `El plan de despliegue está listo: ${ev.recursos} ${ev.recursos === 1 ? "recurso" : "recursos"}. `
+        + "Revíselo en la mesa de trabajo; solo se aplica si usted escribe el ID del proyecto.";
+    }
+    if (ev.tipo === "confirmacion") {
+      texto = ev.sobre === "plan"
+        ? (ev.coincide ? "Apruebo el plan: aplíquelo." : "No apruebo el plan.")
+        : (ev.coincide ? "Destruya los recursos." : "Conserve los recursos.");
+    }
+    if (ev.tipo === "pregunta_destruir") {
+      if (ev.estado === "desplegado") {
+        texto = `El plan se aplicó${ev.codigo ? ` y la prueba HTTP respondió ${ev.codigo}` : ""}. `
+          + "Indique en la mesa de trabajo si destruyo los recursos ahora o los conservo.";
+        if (ev.codigo === 200) clase += " bien";
+      } else {
+        texto = "El apply falló. Indique en la mesa de trabajo si destruyo lo que se alcanzó a crear.";
+        clase += " mal";
+      }
+    }
+    if (ev.tipo === "despliegue") {
+      const bien = ev.estado === "desplegado" || ev.estado === "destruido";
+      texto = `${ESTADO_DESPLIEGUE[ev.estado] || ev.estado}.`;
+      if (!bien && ev.estado !== "cancelado" && ev.motivo) texto += ` ${ev.motivo}`;
+      if (bien) clase += " bien";
+      else if (ev.estado !== "cancelado") clase += " mal";
+    }
     return el("div", { class: `entrada ${clase}` },
       el("div", { class: "autor", text: ev.autor === "usted" ? "Usted" : "Agente" }),
       el("div", { class: "texto", text: texto }),
@@ -234,11 +323,16 @@
     else if (s.estado === "revision") contenido = redactorCorreccion(borrador("campo-correccion"));
     else if (EN_CURSO.includes(s.estado)) {
       contenido = [el("p", { class: "ocupado-texto", text: "El agente está trabajando. Puede seguir el avance en la mesa de trabajo." })];
+    } else if (despliegueAbierto(s)) {
+      contenido = [el("p", { class: "ocupado-texto",
+        text: "Hay un despliegue abierto. Termínelo en la mesa de trabajo antes de empezar otro requerimiento." })];
     } else {
       contenido = [el("div", { class: "fila-acciones" },
         el("button", { class: "boton", type: "button", onclick: nuevoRequerimiento, text: "Nuevo requerimiento" }))];
     }
-    if (estado.error) contenido.push(el("p", { class: "error-linea", role: "alert", text: estado.error }));
+    // Con el panel de despliegue a la vista, el error se muestra ahí.
+    const enPanel = !!s && !!s.resultado && s.despliegue.habilitado;
+    if (estado.error && !enPanel) contenido.push(el("p", { class: "error-linea", role: "alert", text: estado.error }));
     caja.replaceChildren(...contenido);
     if (enfocado) {
       const c = document.getElementById(enfocado);
@@ -280,14 +374,19 @@
 
     return [
       el("h2", { class: "titular", text: "Describa la infraestructura que necesita" }),
-      el("p", { class: "bajada", text: "El agente la convierte en Terraform para Google Cloud, lo valida en un sandbox sin acceso a internet y le entrega los archivos. No crea recursos en su cuenta." }),
+      el("p", { class: "bajada", text: estado.info && estado.info.despliegue
+        ? "El agente la convierte en Terraform para Google Cloud y lo valida en un sandbox sin acceso a internet. Si pasa todos los controles, puede desplegarlo aquí mismo: nada se crea hasta que usted aprueba el plan."
+        : "El agente la convierte en Terraform para Google Cloud, lo valida en un sandbox sin acceso a internet y le entrega los archivos. No crea recursos en su cuenta." }),
       formulario,
       el("div", { class: "ejemplos" },
         el("p", { text: "O empiece con un ejemplo" }),
-        el("ul", {}, EJEMPLOS.map((t) => el("li", {}, el("button", {
-          class: "ejemplo", type: "button", text: t,
-          onclick: () => { campo.value = t; campo.dispatchEvent(new Event("input")); campo.focus(); },
-        }))))),
+        el("ul", {}, ejemplos().map((ej) => {
+          const texto = typeof ej === "string" ? ej : ej.texto;
+          return el("li", {}, el("button", {
+            class: "ejemplo", type: "button", text: typeof ej === "string" ? ej : ej.etiqueta,
+            onclick: () => { campo.value = texto; campo.dispatchEvent(new Event("input")); campo.focus(); },
+          }));
+        }))),
     ];
   }
 
@@ -325,6 +424,7 @@
     const enRevision = s.estado === "analizando" || s.estado === "revision";
     if (enRevision) partes.push(hojaEspecificacion(s, false));
     if (s.resultado) partes.push(veredicto(s));
+    if (s.resultado) partes.push(panelDespliegue(s));
     if (s.estado === "generando" || s.resultado || s.intentos.length) partes.push(lineaDeControles(s));
     if (s.resultado && Object.keys(s.resultado.archivos).length) partes.push(archivos(s));
     if (!enRevision && s.especificacion) partes.push(hojaEspecificacion(s, true));
@@ -332,8 +432,10 @@
       partes.push(el("div", { class: "aviso-despliegue" },
         "No se obtuvo una especificación válida. Reformule el requerimiento con más detalle y vuelva a intentarlo."));
     }
-    mesa.replaceChildren(...partes);
+    const enfocado = document.activeElement && mesa.contains(document.activeElement) ? document.activeElement.id : null;
+    mesa.replaceChildren(...partes.filter(Boolean));
     mesa.scrollTop = scroll;
+    if (enfocado) { const c = document.getElementById(enfocado); if (c) c.focus(); }
   }
 
   function introduccion() {
@@ -344,6 +446,9 @@
       ["Valida en un sandbox", "Pasa cada intento por la misma línea de controles, en un contenedor sin internet:"],
       ["Repara con los errores", `Si un control falla, le devuelve el error al modelo y vuelve a validar, hasta ${estado.info ? estado.info.max_reparaciones : 5} veces.`],
     ];
+    if (estado.info && estado.info.despliegue) {
+      pasos.push(["Despliega con su aprobación", "Si el código pasó todos los controles, calcula un plan con la cuenta de despliegue, lo revisa y lo aplica solo cuando usted escribe el ID del proyecto. Después prueba la URL del servicio."]);
+    }
     const ejemploVia = via(Object.fromEntries(CONTROLES.map((c) => [c, "pendiente"])), false);
     return el("div", { class: "introduccion" },
       el("h2", { text: "Cómo trabaja el agente" }),
@@ -357,10 +462,163 @@
   }
 
   function avisoDespliegue() {
+    if (estado.info && estado.info.despliegue) {
+      return el("p", { class: "aviso-despliegue" },
+        "Esta interfaz puede desplegar en el proyecto ", el("code", { text: estado.info.proyecto }),
+        ". Solo despliega código que pasó todos los controles, con un plan guardado que usted aprueba escribiendo el "
+        + "ID del proyecto, y pide una segunda confirmación para destruir.");
+    }
     return el("p", { class: "aviso-despliegue" },
-      "Esta interfaz nunca despliega. Para desplegar el caso real se usa ",
+      "Esta interfaz está en modo evaluación y nunca despliega. Para desplegar se usa la interfaz de despliegue (",
+      el("code", { text: "docker compose up -d web-puente-despliegue" }), ") o ",
       el("code", { text: "desplegar" }),
-      " en la terminal, que pide escribir el ID del proyecto antes de aplicar y otra vez antes de destruir.");
+      " en la terminal; las dos piden escribir el ID del proyecto antes de aplicar y otra vez antes de destruir.");
+  }
+
+  // ---------------------------------------------------------------- despliegue
+
+  function panelDespliegue(s) {
+    const d = s.despliegue;
+    if (!d.habilitado) return s.resultado.ok ? avisoDespliegue() : null;
+    const a = d.actual;
+    const cuerpo = [];
+    let estadoTexto;
+    if (!a) {
+      estadoTexto = d.desplegable ? `Proyecto ${d.proyecto}` : "No disponible";
+      cuerpo.push(d.desplegable ? formularioDespliegue(s, d, false) : el("p", { class: "vacio", text: d.motivo }));
+    } else if (a.fase === "esperando_aprobacion") {
+      estadoTexto = "Esperando su aprobación";
+      cuerpo.push(
+        el("p", { class: "fila-texto", text: "Este es el plan que se aplicaría, calculado con la cuenta de despliegue. "
+          + "Pasó la revisión automática: solo crea recursos del catálogo y no borra ni reemplaza nada." }),
+        tablaCambios(a.cambios),
+        a.plan_texto ? el("details", { class: "hallazgos" },
+          el("summary", { text: "Ver el plan completo de Terraform" }),
+          el("pre", { class: "texto-plano", tabindex: "0", text: a.plan_texto })) : null,
+        confirmacionProyecto(s, d, {
+          etiqueta: `Para aplicar este plan, escriba el ID del proyecto (${d.proyecto})`,
+          boton: "Aplicar el plan", alterno: "Cancelar el despliegue",
+        }));
+    } else if (a.fase === "esperando_destruccion") {
+      estadoTexto = a.estado === "desplegado" ? "Desplegado; falta decidir si se destruye" : (ESTADO_DESPLIEGUE[a.estado] || a.estado);
+      cuerpo.push(
+        datosDespliegue(a),
+        confirmacionProyecto(s, d, {
+          etiqueta: `Para destruir ahora los recursos, escriba otra vez el ID del proyecto (${d.proyecto})`,
+          boton: "Destruir los recursos", alterno: "Conservar los recursos",
+        }));
+    } else if (a.fase !== "terminado") {
+      estadoTexto = "En curso";
+      cuerpo.push(el("p", { class: "progreso", text: `${TEXTO_FASE[a.fase]}… (${segundos(a.segundos)})` }));
+      if (a.cambios.length && a.fase !== "planificando") cuerpo.push(tablaCambios(a.cambios));
+    } else {
+      estadoTexto = ESTADO_DESPLIEGUE[a.estado] || a.estado;
+      cuerpo.push(datosDespliegue(a));
+      if (d.desplegable) cuerpo.push(formularioDespliegue(s, d, true));
+    }
+    const error = estado.errorDespliegue || estado.error;
+    if (error) cuerpo.push(el("p", { class: "error-linea", role: "alert", text: error }));
+    return el("article", { class: "hoja" },
+      el("div", { class: "hoja-cabeza" },
+        el("h2", { class: "hoja-titulo", text: "Despliegue" }),
+        el("p", { class: "hoja-estado", text: estadoTexto })),
+      el("div", { class: "hoja-cuerpo" }, cuerpo));
+  }
+
+  function formularioDespliegue(s, d, reintento) {
+    const campos = d.variables.map((n) => {
+      const entrada = el("input", { type: "password", id: `var-${n}`, class: "campo-linea", autocomplete: "off",
+        maxlength: "256" });
+      entrada.value = estado.borradores[n] || "";
+      entrada.addEventListener("input", () => { estado.borradores[n] = entrada.value; });
+      return el("label", { class: "campo-var" }, el("span", { text: n }), entrada);
+    });
+    return el("form", { class: "formulario-despliegue", onsubmit: (e) => {
+      e.preventDefault();
+      const variables = Object.fromEntries(d.variables.map((n) => [n, estado.borradores[n] || ""]));
+      const falta = d.variables.find((n) => !variables[n]);
+      if (falta) { estado.errorDespliegue = `Escriba el valor de ${falta}.`; renderMesa(); return; }
+      estado.errorDespliegue = null;
+      enviar(async () => {
+        const r = await api(`/api/sesiones/${s.id}/despliegue`, { variables });
+        estado.borradores = {};
+        return r;
+      });
+    } },
+    el("p", { class: "fila-texto", text: reintento
+      ? "Puede preparar el plan otra vez."
+      : `Este código pasó todos los controles y se puede desplegar en el proyecto ${d.proyecto}. `
+        + "Primero se calcula el plan; nada se crea hasta que usted lo apruebe." }),
+    campos.length ? el("p", { class: "fila-texto", text: "El plan necesita estos valores. Se usan solo en este "
+      + "despliegue: no se guardan ni se muestran. Conviene usar solo letras y números." }) : null,
+    campos,
+    el("div", { class: "fila-acciones" },
+      el("button", { class: "boton", type: "submit", disabled: estado.enviando, text: "Preparar el plan de despliegue" })));
+  }
+
+  function confirmacionProyecto(s, d, { etiqueta, boton, alterno }) {
+    const entrada = el("input", { type: "text", id: "campo-proyecto", class: "campo-linea", autocomplete: "off",
+      spellcheck: "false", placeholder: "ID del proyecto" });
+    entrada.value = estado.borradorId;
+    entrada.addEventListener("input", () => { estado.borradorId = entrada.value; });
+    const mandar = (texto) => {
+      estado.errorDespliegue = null;
+      enviar(async () => {
+        const r = await api(`/api/sesiones/${s.id}/despliegue/confirmacion`, { texto });
+        estado.borradorId = "";
+        return r;
+      });
+    };
+    return el("form", { class: "formulario-despliegue", onsubmit: (e) => {
+      e.preventDefault();
+      // Un error de tipeo no debe cancelar el despliegue: se avisa aquí. Quien decide es el servidor.
+      if (entrada.value.trim() !== d.proyecto) {
+        estado.errorDespliegue = "Lo que escribió no coincide con el ID del proyecto.";
+        renderMesa();
+        return;
+      }
+      mandar(entrada.value.trim());
+    } },
+    el("label", { class: "campo-var" }, el("span", { text: etiqueta }), entrada),
+    el("div", { class: "fila-acciones" },
+      el("button", { class: "boton", type: "submit", disabled: estado.enviando, text: boton }),
+      el("button", { class: "boton secundario", type: "button", disabled: estado.enviando, text: alterno,
+        onclick: () => mandar("") })));
+  }
+
+  function tablaCambios(cambios) {
+    const ACCION = { create: "crear", update: "actualizar", "no-op": "sin cambios", read: "leer" };
+    return el("table", { class: "tabla cambios" },
+      el("thead", {}, el("tr", {}, ["Recurso", "Acción"].map((t) => el("th", { scope: "col", text: t })))),
+      el("tbody", {}, cambios.map((c) => el("tr", {},
+        el("td", { text: c.direccion }),
+        el("td", {}, el("span", { class: "accion-crear", text: c.acciones.map((x) => ACCION[x] || x).join(", ") }))))));
+  }
+
+  function datosDespliegue(a) {
+    const enEspera = a.fase === "esperando_destruccion" && a.estado === "desplegado";
+    const filas = [["Estado", enEspera ? "Desplegado" : (ESTADO_DESPLIEGUE[a.estado] || a.estado)]];
+    // Con el despliegue aplicado, el detalle solo repite el comando para destruir, que va más abajo.
+    if (a.motivo && !a.aplicado) filas.push(["Detalle", a.motivo]);
+    const p = a.prueba_http || {};
+    if (typeof p.url === "string" && p.url.startsWith("https://")) {
+      filas.push(["URL del servicio", el("a", { href: p.url, target: "_blank", rel: "noopener noreferrer", text: p.url })]);
+    }
+    if (p.codigo !== undefined && p.codigo !== null) {
+      filas.push(["Prueba HTTP", `código ${p.codigo}`
+        + (p.latencia_ms !== undefined ? ` en ${numero(p.latencia_ms, 0)} ms` : "")
+        + (p.intentos ? `, intento ${p.intentos}` : "")]);
+    } else if (p.error) {
+      filas.push(["Prueba HTTP", p.error]);
+    }
+    const dur = Object.entries(a.duraciones_s || {});
+    if (dur.length) filas.push(["Duración", dur.map(([k, v]) => `${k.replace("_", " ")} ${segundos(v)}`).join(", ")]);
+    if (a.cambios.length) filas.push(["Recursos del plan", String(a.cambios.length)]);
+    filas.push(["Evidencia", a.evidencia]);
+    if (a.aplicado && !a.destruido && a.directorio) {
+      filas.push(["Para destruir después", el("code", { text: `docker compose run --rm despliegue destruir ${a.directorio}` })]);
+    }
+    return el("dl", { class: "datos" }, filas.map(([dt, dd]) => el("div", {}, el("dt", { text: dt }), el("dd", {}, dd))));
   }
 
   function hojaEspecificacion(s, plegada) {
