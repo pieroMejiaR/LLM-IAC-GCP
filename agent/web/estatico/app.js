@@ -238,6 +238,7 @@
     }
     // Enlace a una sesión (#sesion=<id>): permite reabrirla en otra pestaña o capturarla para el informe.
     const enlace = /[#&]sesion=([0-9a-f]{16})/.exec(location.hash);
+    estado.todoAbierto = /[#&]vista=todo/.test(location.hash);     // para capturas: secciones plegadas abiertas
     if (enlace) {
       sessionStorage.setItem("sesion", enlace[1]);
       history.replaceState(null, "", location.pathname);
@@ -324,6 +325,7 @@
     const bajar = renderConversacion();
     renderRedactor();
     renderMesa();
+    if (estado.todoAbierto) document.querySelectorAll("#mesa details").forEach((d) => { d.open = true; });
     // Al final: el redactor cambia de alto y con él el área visible del registro.
     if (bajar) {
       const registro = document.getElementById("registro");
