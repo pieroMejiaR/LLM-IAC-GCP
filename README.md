@@ -42,6 +42,18 @@ python -m eval.run_batch --reanudar
 docker compose run --rm --entrypoint python agente -m eval.run_batch
 ```
 
+### Análisis estadístico
+
+`eval/analysis.py` lee `runs.csv` y escribe `analisis.md` (tablas 5.1 a 5.4), `analisis.json` y `por_escenario.csv` en `<carpeta del CSV>/analisis/`. Compara T1 con T0 con tres métodos: Wilcoxon de rangos con signo pareado por escenario (promedio de las repeticiones, p exacto y ajuste de Holm entre métricas), McNemar para validate y plan con los pares de la misma repetición (p exacto y χ² con corrección de continuidad), e IC 95 % por bootstrap remuestreando escenarios (B = 10 000, semilla fija). Excluye las corridas con `tipo_error = entorno` y, si una corrida se repitió, usa su última fila. Solo usa la biblioteca estándar.
+
+`eval/simulacion.py` genera un `runs.csv` inventado para probar el análisis sin gastar en el LLM; esos datos no van al informe.
+
+```bash
+python -m eval.analysis resultados/runs.csv
+python -m eval.simulacion && python -m eval.analysis resultados/simulado/runs.csv
+python -m eval.simulacion --efecto nulo --salida resultados/simulado-nulo/runs.csv   # T1 igual a T0
+```
+
 ## Sandbox en Docker
 
 Es la forma de correr el experimento y el despliegue. Requiere Docker con Compose v2 y haber ejecutado `gcloud auth application-default login`. En Windows la credencial se encuentra sola; en Linux o macOS se indica con `ADC_HOST` en `.env`.
