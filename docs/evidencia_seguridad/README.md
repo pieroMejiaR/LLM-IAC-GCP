@@ -2,6 +2,7 @@
 
 | Archivo | Prueba | Cómo se generó |
 | --- | --- | --- |
+| `pytest-contenedor-main.txt` | S1 a S4, S6, S7 y S8 sobre el código entregado (165 pruebas pasan, 1 omitida) | `docker compose run --rm -T pruebas` sobre `main` (commit `3d0bcce`), 2026-11-10 |
 | `pytest-contenedor-v1.1.txt` | S1 a S4, S6, S7 y S8 (130 pruebas) | `docker compose run --rm -T pruebas` sobre el código del experimento más el ingreso de contraseñas del modo despliegue (commit `b0aa708`), 2026-11-10 |
 | `pytest-contenedor.txt` | S1 a S4, S6, S7 y S8 (110 pruebas) | `docker compose run --rm -T pruebas` sobre el código del piloto (`4a78d23`), 2026-11-09 |
 | `S5-20261110-025243.txt` | S5: la cuenta Viewer no puede crear un bucket (4/4) | `docker compose run --rm --entrypoint python agente -m sandbox.pruebas_seguridad s5` en el proyecto `agente-iac-pm`, 2026-11-10 |
