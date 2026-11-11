@@ -71,7 +71,7 @@ El presente trabajo de investigación experimental evalúa el impacto de un agen
 
 El experimento evaluó 12 escenarios de complejidad progresiva (4 básicos, 5 intermedios y 3 avanzados) con 3 repeticiones por tratamiento en orden aleatorio con semilla fija (72 corridas en total, con un costo de LLM de 1.66 USD). Un lote piloto previo reveló que el entorno de evaluación hacía fallar `terraform plan` por falta de valores en las variables sensibles, y que el bucle de reparación de T1 superaba ese control escribiendo contraseñas en el código; el sandbox se corrigió antes del experimento. Con el entorno corregido, ambos tratamientos superaron `validate` y `plan` en casi todas las corridas (**T0: 97.2 %; T1: 100 %**), sin diferencia significativa (McNemar exacto, $p = 1.0$), por lo que no se rechaza la hipótesis nula. T1 incluyó todos los tipos de recurso esperados (cobertura de 100 % frente a 88.5 % en T0; IC 95 % de la diferencia [4.2 %, 19.4 %]), a cambio de 23 s más por corrida y del doble de costo ($p < 0.01$ tras el ajuste de Holm).
 
-Asimismo, se validó la transferencia a entornos productivos mediante el despliegue real de una aplicación multicontenedor (sistema de pedidos gastronómicos *Picantería Digital*: API NestJS, frontend SPA en Nginx, base de datos Cloud SQL PostgreSQL 17 y Secret Manager en la región `southamerica-west1`). La infraestructura se aprovisionó de manera 100 % autónoma tras aprobación humana explícita del plan en 380.5 s, respondiendo exitosamente a pruebas de disponibilidad HTTP en la primera verificación pública.
+Asimismo, se comprobó el uso del agente en un caso real: el despliegue en Google Cloud Platform de una aplicación de dos contenedores (sistema de pedidos *Picantería Digital*: API en NestJS, frontend en Nginx, Cloud SQL PostgreSQL 17 y Secret Manager en la región `southamerica-west1`), hecho desde la interfaz de chat a partir de un requerimiento en lenguaje simple y de la carpeta de la aplicación. El código generado superó todos los controles sin reparaciones (71.2 s y 0.035 USD de LLM) y el plan de 17 recursos se aplicó tras la aprobación humana. El primer `apply` se detuvo después de crear 13 recursos, porque la cuenta de despliegue no tenía permiso de lectura sobre el repositorio de imágenes, una condición del proyecto que `plan` no detecta. Otorgado el permiso, un segundo `apply` creó los 4 recursos restantes y la aplicación respondió con código 200 en la primera verificación HTTP.
 
 Por último, la comparación con la redacción manual cronometrada de 3 escenarios (uno por nivel), realizada por un integrante del equipo, arrojó una **reducción de tiempo del 98.7 %** (de 3.25 horas a 2.6 minutos de agente, sin contar la revisión humana) y una **reducción del costo directo de autoría del 99.95 %** (de 179.12 USD en horas de ingeniería, a la tarifa de referencia de 55 USD por hora, a 0.087 USD en tokens de LLM).
 
@@ -81,19 +81,21 @@ Por último, la comparación con la redacción manual cronometrada de 3 escenari
 
 La gestión de infraestructura en la nube ha transitado desde la configuración manual interactiva mediante consolas web hacia la Infraestructura como Código (IaC), permitiendo tratar las especificaciones de topologías de red, máquinas virtuales, bases de datos gestionadas y servicios *serverless* como artefactos de software sujetos a control de versiones, revisión de pares y canalizaciones de integración continua (CI/CD) [1]. Terraform, desarrollado por HashiCorp, se ha posicionado como el lenguaje declarativo estándar *de facto* para la orquestación agnóstica y multiplataforma de recursos de nube [2].
 
-A pesar de sus beneficios, la redacción manual de código Terraform exige un conocimiento exhaustivo de la sintaxis del lenguaje de configuración HashiCorp (HCL), los esquemas de recursos de cada proveedor (frecuentemente actualizados con cambios que rompen la compatibilidad hacia atrás), las políticas de permisos de Identidad y Gestión de Accesos (IAM) de mínimo privilegio, y las guías de endurecimiento de seguridad corporativas (CIS Benchmarks) [3]. Esta complejidad genera cuellos de botella significativos en equipos de desarrollo ágil y startups, aumentando los costos de consultoría especializada y elevando el riesgo de configuraciones erróneas que resulten en brechas de seguridad o sobrecostos imprevistos de facturación.
+A pesar de sus beneficios, la redacción manual de código Terraform exige un conocimiento exhaustivo de la sintaxis del lenguaje de configuración HashiCorp (HCL), los esquemas de recursos de cada proveedor (frecuentemente actualizados con cambios que rompen la compatibilidad hacia atrás), las políticas de permisos de Identidad y Gestión de Accesos (IAM) de mínimo privilegio, y las guías de endurecimiento de seguridad (CIS Benchmarks) [3]. Esta complejidad genera cuellos de botella en equipos pequeños, aumenta los costos de consultoría especializada y eleva el riesgo de configuraciones erróneas que resulten en brechas de seguridad o sobrecostos de facturación.
 
-La reciente emergencia de los Modelos de Lenguaje Grande (LLMs) ha abierto la posibilidad de sintetizar código de infraestructura directamente a partir de descripciones funcionales expresadas en lenguaje natural [4]. Sin embargo, la aplicación ingenua de LLMs para la generación de IaC enfrenta desafíos severos:
-1. **Alucinaciones de sintaxis y argumentos obsoletos:** Los LLMs entrenados en corpus estáticos frecuentemente generan atributos deprecados o inventan estructuras que no existen en las versiones vigentes de los proveedores (por ejemplo, utilizar bloques desactualizados de red en Cloud Run v2 o tiers incompatibles en Cloud SQL PostgreSQL 17).
-2. **Brechas de seguridad y malas prácticas:** El código generado por modelos generalistas suele priorizar la brevedad funcional omitiendo controles esenciales de seguridad, tales como dejar almacenes de objetos con acceso público irrestricto, omitir el cifrado de datos o exponer credenciales sensibles en texto plano dentro del código fuente [5].
-3. **Riesgos de ejecución en entornos no confinados:** La ejecución directa de código de infraestructura generado por una IA para propósitos de prueba o validación representa una superficie de ataque crítica. Un código generado malintencionado o defectuoso puede invocar scripts locales destructivos (`provisioner "local-exec"`), descargar módulos o proveedores de repositorios no autenticados, o intentar exfiltrar tokens de autenticación y credenciales de la nube [6].
+Los Modelos de Lenguaje Grande (LLMs) han abierto la posibilidad de sintetizar código de infraestructura directamente a partir de descripciones expresadas en lenguaje natural [4], [19]. Sin embargo, su aplicación directa a la generación de IaC enfrenta tres desafíos:
+1. **Alucinaciones de sintaxis y argumentos obsoletos:** Los LLMs entrenados en corpus estáticos pueden generar atributos deprecados o inventar estructuras que no existen en las versiones vigentes de los proveedores (por ejemplo, un argumento inexistente en la instancia de Cloud SQL o un tier incompatible con la edición por defecto de PostgreSQL 17).
+2. **Brechas de seguridad y malas prácticas:** El código de infraestructura puede contener defectos de seguridad conocidos, como credenciales escritas en el código o accesos sin restricción. La literatura los documenta en scripts escritos por personas [5], y un modelo generalista puede reproducirlos si ningún control los detecta.
+3. **Riesgos de ejecución en entornos no confinados:** Ejecutar código de infraestructura generado por un modelo para probarlo o validarlo es ejecutar código no confiable. Ese código puede invocar comandos locales con `provisioner "local-exec"` [6], ejecutar programas externos durante `plan` con `data "external"` [10], descargar módulos o proveedores de terceros, o intentar leer las credenciales de la nube del equipo donde corre.
 
-Para abordar estas problemáticas, el presente trabajo propone y evalúa formalmente un **Agente Inteligente de IaC para Google Cloud Platform** que articula tres pilares metodológicos:
-- **Grounding técnico estructurado:** Integración de un catálogo formal de servicios y extracción en tiempo de construcción del esquema del proveedor `google` y `google-beta`, anclando las respuestas del LLM a los tipos de datos, atributos permitidos y dependencias válidas.
-- **Bucle de validación y reparación automática (T1):** Un ciclo cerrado donde el código sintáctico es analizado consecutivamente por un `guard` estático de AST, formateadores formales, `terraform validate`, linters semánticos (`tflint`) y analizadores de cumplimiento de seguridad (`checkov`). Si se detecta algún defecto, el agente extrae de manera estructurada los diagnósticos de error y genera prompts de reparación iterativa con memoria de intentos previos.
-- **Sandbox endurecido y confinado:** Empaquetamiento integral en contenedores Docker sin privilegios (`rootless`), sistema de archivos de solo lectura, políticas de denegación de red externa canalizadas mediante un proxy Squid restrictivo hacia APIs de Google exclusivamente, y uso de cuentas de servicio con rol Viewer suplantadas únicamente para la fase de inspección de estado (`plan`).
+Para abordar estos problemas, el presente trabajo propone y evalúa un **agente de IaC para Google Cloud Platform** que articula tres pilares:
+- **Grounding técnico estructurado:** Un catálogo de servicios y el esquema del proveedor `google`, extraído al construir la imagen, anclan las respuestas del LLM a los tipos de recurso, los argumentos y las dependencias válidas de la versión fijada.
+- **Bucle de validación y reparación automática (T1):** El código generado pasa por una revisión estática de su estructura (`guard`), `terraform fmt`, `terraform validate`, un linter específico de Google Cloud (`tflint`), un analizador de seguridad (`checkov`) y `terraform plan`. Si algún control falla, el agente entrega los diagnósticos al modelo y le pide corregir el código, hasta un máximo de cinco reparaciones.
+- **Sandbox confinado:** El agente y Terraform corren en contenedores Docker sin privilegios y con sistema de archivos de solo lectura, en una red interna cuya única salida es un proxy que solo permite las APIs de Google, y `plan` se ejecuta suplantando una cuenta de servicio con rol Viewer.
 
-La presente memoria técnica expone el marco metodológico, el diseño experimental exhaustivo sobre 72 corridas controladas, la validación empírica en un caso real productivo y el análisis comparativo formal de costo y tiempo humano frente a la automatización basada en agentes.
+El prototipo se usa por línea de comandos y mediante una interfaz web de chat, desde la cual una persona sin conocimientos de Terraform describe lo que necesita, revisa la especificación propuesta y, en el modo despliegue, aprueba la aplicación del plan escribiendo el ID del proyecto.
+
+El presente informe expone el marco metodológico, el diseño experimental sobre 72 corridas controladas, el despliegue de un caso real en Google Cloud Platform y la comparación de costo y tiempo frente a la redacción manual.
 
 ---
 
@@ -102,20 +104,23 @@ La presente memoria técnica expone el marco metodológico, el diseño experimen
 La convergencia entre la inteligencia artificial generativa y la ingeniería de infraestructura ha generado un creciente interés académico e industrial en los últimos tres años. Diversos trabajos han examinado las capacidades y limitaciones de los modelos fundacionales para la síntesis de configuraciones declarativas.
 
 ### 2.1 Modelos de Lenguaje para Generación de Código de Infraestructura
-Estudios pioneros como los de Hou et al. [4] evaluaron la precisión de modelos como GPT-3.5 y GPT-4 en la generación de scripts de Ansible y plantillas de Terraform. Sus hallazgos revelaron que, si bien los modelos demuestran una comprensión conceptual adecuada de las arquitecturas solicitadas, más del 45 % de las configuraciones generadas en un solo paso (*zero-shot prompting*) contienen errores sintácticos o referencias a tipos de recursos inexistentes.
 
-Trabajos más recientes, como el de Martínez et al. [5], analizaron específicamente la presencia de "olores de código" (*code smells*) y vulnerabilidades de seguridad en manifiestos de Terraform generados por IA, concluyendo que los modelos tienden a omitir configuraciones de cifrado en reposo, crear políticas de IAM con comodines (`"*"`) y dejar redes de acceso público abiertas sin cortafuegos.
+IaC-Eval [4] es un banco de pruebas para la generación de programas de IaC en la nube a partir de lenguaje natural. Sus autores reportan que el mejor modelo evaluado, GPT-4, alcanzó una exactitud *pass@1* de 19.36 %, lo que muestra que la generación en un solo paso estaba lejos de ser confiable en el momento de ese estudio. Srivatsa et al. [19] revisan el uso de LLMs para generar IaC y señalan los desafíos que siguen abiertos en esta línea.
+
+En cuanto a la seguridad, Rahman et al. [5] identificaron siete tipos de olores de seguridad (*security smells*) en scripts de IaC, entre ellos las credenciales escritas en el código. Esos defectos se describieron en código escrito por personas, y el código generado por un modelo puede reproducirlos si ningún control los detecta.
 
 ### 2.2 Validación en el Bucle (Self-Correction y Feedback Loops)
-La limitación inherente del prompting sin retroalimentación motivó el desarrollo de arquitecturas basadas en bucles de corrección (*Self-Debugging / Reflexion*) [7], [8]. En el dominio de IaC, herramientas como *Terraform-Gen* y *AutoIaC* introdujeron verificaciones sintácticas preliminares mediante `terraform validate`. Sin embargo, la literatura previa adolece de tres vacíos metodológicos fundamentales:
-1. **Falta de linters profundos y análisis estático de seguridad:** La mayoría de los enfoques se limitan a validar la sintaxis de HCL, omitiendo linters de buenas prácticas específicas de la nube (como `tflint-ruleset-google`) y escáneres estáticos de políticas de seguridad como `Checkov` [9].
-2. **Ausencia de grounding de esquema:** Los agentes suelen depender de la memoria paramétrica del LLM, la cual se desactualiza rápidamente frente al ritmo de lanzamientos de los proveedores de nube (por ejemplo, el proveedor `google` publica actualizaciones mayores y menores mensualmente).
-3. **Inexistencia de un modelo de amenazas de ejecución segura:** Probar código generado por LLMs mediante comandos como `terraform init` o `terraform plan` dentro del entorno de desarrollo del operador expone el sistema a ataques de ejecución arbitraria de comandos y robo de credenciales mediante bloques `data "external"`, `provisioner` o proveedores maliciosos de terceros [10].
+
+La limitación del prompting sin retroalimentación motivó el desarrollo de arquitecturas basadas en bucles de corrección (*Self-Debugging* y *Reflexion*) [7], [8], en las que el modelo recibe el resultado de ejecutar o verificar su salida y la corrige. Al llevar esa idea a IaC, este trabajo atiende tres aspectos:
+1. **Validación más allá de la sintaxis:** Además de `terraform validate`, el bucle incluye un linter de buenas prácticas específico de la nube (`tflint-ruleset-google`) y un analizador estático de políticas de seguridad (Checkov) [9].
+2. **Grounding de esquema:** La memoria paramétrica del LLM se desactualiza frente al ritmo de publicación de los proveedores de nube, por lo que el agente incluye en el contexto el esquema de la versión fijada del proveedor.
+3. **Ejecución segura:** Ejecutar `terraform init` o `terraform plan` sobre código generado, en el equipo del operador, permite que ese código ejecute programas locales mediante `provisioner` o `data "external"` [6], [10], o que instale proveedores de terceros. Por eso el agente trata el código generado como no confiable y lo ejecuta en un sandbox.
 
 ### 2.3 Posicionamiento del Presente Estudio
-El agente desarrollado en esta investigación supera el estado del arte al integrar:
-- Validación multinivel: Sintáctica (AST HCL en `guard.py`), estructural (`terraform validate`), semántica específica de GCP (`tflint`) y de seguridad corporativa (`checkov`).
-- Modelo de contención estricto S1–S8 que garantiza que ni el LLM ni Terraform puedan escapar del contenedor ni exfiltrar secretos corporativos durante el proceso de evaluación.
+
+El agente desarrollado en esta investigación integra:
+- Validación en varios niveles: estructural (`guard.py` y `terraform validate`), semántica específica de GCP (`tflint`) y de seguridad (`checkov`), además de `terraform plan` contra las APIs reales con una cuenta de solo lectura.
+- Un modelo de contención evaluado con las pruebas S1 a S8, diseñado para que ni el código generado ni Terraform salgan del contenedor, usen otros proveedores o desplieguen sin aprobación humana.
 
 ---
 
@@ -257,19 +262,35 @@ Las versiones se verificaron dentro de la imagen construida (`docs/evidencia_seg
 
 ### 4.2 COMPONENTES DEL AGENTE IAC Y MODO DESPLIEGUE
 
-El agente se organiza en módulos desacoplados con responsabilidades estrictas:
-1. **Pipeline de Razonamiento (`agent/pipeline.py`):**
-   - **Fase Analizar:** El LLM recibe el requerimiento en lenguaje natural junto con el catálogo de servicios permitidos (`grounding/catalog.yaml`) y devuelve un objeto JSON estructurado con la arquitectura especificada.
-   - **Fase Generar:** El LLM genera los archivos `.tf` (`main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`), asistido por el esquema detallado de argumentos del proveedor (`grounding/esquema_catalogo.json`).
-   - **Fase Validar:** El código pasa por `sandbox/guard.py` (análisis de AST HCL), `terraform fmt`, `terraform init`, `terraform validate`, `tflint`, `checkov` y opcionalmente `terraform plan`.
-   - **Fase Reparar:** Si se detecta un fallo, el agente construye un prompt con los mensajes de error exactos del compilador o escáner, obligando al modelo a reescribir la configuración defectuosa.
-2. **Modo Despliegue con Aprobación Humana (`agent/deploy.py`):**
-   - El despliegue a producción requiere invocación explícita mediante `python -m agent desplegar <caso.yaml>`.
-   - **Control de Plan Guardado:** Se ejecuta `terraform plan -out=plan.tfplan`. Si el plan contiene recursos fuera del catálogo o acciones destructivas (`delete`, `replace`), el agente aborta automáticamente (Prueba S8).
-   - **Aprobación de Doble Factor Humano:** Para ejecutar `terraform apply`, el operador humano debe ingresar manualmente el ID exacto del proyecto GCP por consola (Prueba S7). Una confirmación idéntica se solicita si el operador desea destruir la infraestructura creada al concluir la sesión.
-3. **Interfaz Web de Usuario (`agent/web/` y `sandbox/puente/`):**
-   - Se implementó un chat interactivo para el modo evaluación con servidor HTTP nativo sin dependencias de terceros (`agent/web/servidor.py`).
-   - El contenedor del agente permanece confinado en la red interna de Docker (`aislada`), y la interfaz web solo es accesible mediante un puente Nginx (`sandbox/puente/nginx.conf`) que expone el puerto `127.0.0.1:8787`.
+El agente se organiza en módulos con responsabilidades separadas:
+1. **Pipeline de razonamiento (`agent/pipeline.py`):**
+   - **Analizar:** El LLM recibe el requerimiento en lenguaje natural y el catálogo de servicios permitidos (`grounding/catalog.yaml`), y devuelve una especificación en JSON con los servicios, sus nombres y sus parámetros.
+   - **Planificar:** Paso determinista, sin LLM, que traduce la especificación en la lista de tipos de recurso y de archivos por generar, a partir del catálogo.
+   - **Generar:** El LLM escribe los archivos `.tf` con el esquema de argumentos del proveedor en el contexto (`grounding/esquema_catalogo.json`).
+   - **Validar:** El código pasa por `sandbox/guard.py` (análisis estructural del HCL), `terraform fmt`, `terraform init`, `terraform validate`, `tflint`, `checkov` y `terraform plan` con la cuenta Viewer.
+   - **Reparar:** Si un control falla, el agente arma un prompt con los diagnósticos exactos y pide al modelo que corrija el código, hasta un máximo de 5 reparaciones.
+
+   El tratamiento T0 usa una sola llamada de generación, sin especificación previa, sin esquema y sin reparación.
+2. **Modo despliegue con aprobación humana (`agent/deploy.py`):**
+   - **Un solo camino de despliegue:** El comando `desplegar` de la línea de comandos y el panel de despliegue de la interfaz web llaman a la misma función (`ejecutar_despliegue`), de modo que los controles son idénticos en ambos.
+   - **Plan guardado y verificado:** Se ejecuta `terraform plan -out` con la cuenta de despliegue. Si el plan contiene tipos de recurso fuera del catálogo o acciones de borrado o reemplazo, el agente se detiene sin llegar a preguntar (prueba S8).
+   - **Aprobación humana:** Para ejecutar `terraform apply` sobre ese plan guardado, la persona debe escribir el ID exacto del proyecto de GCP; cualquier otra respuesta cancela el despliegue (prueba S7).
+   - **Verificación y cierre:** Después del `apply`, el agente hace una prueba HTTP a la salida `service_url`. Luego pide una segunda confirmación para destruir lo creado; si no se da, los recursos se conservan y pueden destruirse más tarde con el comando `destruir`.
+   - **Valores sensibles:** Las variables sin valor por defecto, como las contraseñas, las escribe la persona al desplegar. El agente no las muestra ni las registra en sus trazas; quedan solo en el estado de Terraform, que no se sube al repositorio.
+3. **Interfaz web de chat (`agent/web/` y `sandbox/puente/`):**
+   - **Servidor:** Un servidor HTTP de la biblioteca estándar de Python, sin dependencias de terceros (`agent/web/servidor.py`), que solo atiende peticiones locales del mismo origen. El contenedor del agente permanece en la red interna de Docker y la interfaz se publica únicamente en `127.0.0.1` mediante un puente Nginx sin privilegios.
+   - **Dos servicios separados:** `web` (puerto 8787) trabaja en modo evaluación y nunca despliega, porque sus rutas de despliegue responden con error 403. `web-despliegue` (puerto 8788, comando `web --despliegue`) exige el proyecto y las dos cuentas de servicio, y es el único que puede aplicar un plan.
+   - **Conversación:** La persona describe lo que necesita en lenguaje simple. El agente propone la especificación y la explica en un bloque «En palabras simples»; la persona la corrige con nuevos mensajes o la aprueba. Entonces el agente genera el código, lo valida y muestra el resultado de cada control y los archivos, que se pueden descargar.
+   - **Despliegue desde el chat:** En `web-despliegue`, y solo si el código superó todos los controles, la persona escribe los valores sensibles en un formulario, revisa el plan calculado con la cuenta de despliegue y lo aprueba escribiendo el ID del proyecto, que se comprueba en el navegador y en el servidor. La interfaz muestra el avance del `apply`, el resultado de la prueba HTTP y la confirmación para conservar o destruir los recursos.
+4. **Lectura de la carpeta de la aplicación (`agent/proyecto.py`):**
+   - **Propósito:** Una persona sin formación técnica no sabe indicar puertos, variables de entorno ni la forma de conexión a la base de datos. En lugar de preguntárselo, la interfaz le permite adjuntar la carpeta de su aplicación.
+   - **Qué se lee:** Solo archivos de configuración reconocidos (`Dockerfile`, `docker-compose`, el `.env` de ejemplo, `package.json`, la plantilla de Nginx y `schema.prisma`), con un límite de 700 KB. Los archivos `.env` reales se rechazan y los valores que parecen secretos se ocultan antes de enviarlos.
+   - **Ficha técnica:** Un analizador determinista, sin LLM, produce una ficha con los componentes, sus puertos, sus variables de entorno, la base de datos y el componente principal. La ficha se adjunta como texto al requerimiento, sin cambiar el prompt de análisis, e incluye indicaciones fijas para el patrón de Cloud Run con Cloud SQL (por ejemplo, armar la cadena de conexión dentro del código y guardar los secretos en Secret Manager).
+5. **Publicación de imágenes (`scripts/publicar-imagenes.ps1`):** El agente no construye ni publica imágenes de contenedor. La interfaz muestra los pasos y el script con el que la persona construye y sube las imágenes al repositorio de Artifact Registry desde su equipo; el Terraform generado las referencia por su nombre.
+
+El despliegue desde el chat, la lectura de la carpeta y la guía de publicación se agregaron después de la etiqueta `v1.1-experimento`. No intervienen en el experimento de la sección 5, que se ejecutó por lotes desde la línea de comandos, y se usaron en el caso real de la sección 5.6.
+
+**Cambios del sandbox después del piloto.** En evaluación, `plan` recibe un valor de relleno para cada variable sin valor por defecto, igual en T0 y T1, para que el control mida el código y no la falta de valores. La revisión estática rechaza las variables sensibles que traen un valor por defecto, así ninguna contraseña queda escrita en el código. Al desplegar, el agente pide el valor de cada variable sin valor por defecto, como contraseñas y claves, sin mostrarlo ni registrarlo en sus trazas.
 
 ---
 
@@ -402,64 +423,65 @@ En su primer intento, T1 escribió valores por defecto en variables sensibles en
 
 ### 5.6 DESPLIEGUE EN GOOGLE CLOUD PLATFORM DEL CASO REAL
 
-Para verificar la validez ecológica y la aplicabilidad industrial del agente, se ejecutó el despliegue del caso real (`casos/caso_real.yaml` — Escenario `REAL-01`), correspondiente al sistema de pedidos del restaurante *Picantería Digital*.
+Para comprobar el uso del agente fuera del experimento, el 10 de noviembre de 2026 se desplegó en Google Cloud Platform el sistema de pedidos *Picantería Digital* desde la interfaz de chat en modo despliegue (sesión `WEB-20261110-231346`, proyecto `agente-iac-pm`, región `southamerica-west1`). Es un solo caso, ejecutado una vez, por lo que se presenta como demostración y no como resultado estadístico. La evidencia completa está en `docs/evidencia_despliegue/WEB-20261110-231346/` y se resume en el Anexo B.
 
-#### 5.6.1 Arquitectura Desplegada
-La infraestructura aprovisionada por el agente en la región `southamerica-west1` (Santiago de Chile) incluyó:
-1. **Frontend Web:** Contenedor Nginx desplegado en Cloud Run v2 (`picanteria-web`), escuchando en el puerto 8080 configurado dinámicamente mediante plantilla `/etc/nginx/templates/default.conf.template`, con proxy reverso seguro hacia la API con `proxy_ssl_server_name on`, encabezados `X-Forwarded-Proto https` y sin suplantación de `Host`.
-2. **Backend API:** Contenedor Node.js / NestJS en Cloud Run v2 (`picanteria-api`), escuchando en el puerto 3000, con montaje de conector Unix socket en `/cloudsql` hacia la base de datos.
-3. **Base de Datos Gestionada:** Instancia Cloud SQL PostgreSQL 17 (`picanteria-db-1107`), edición `ENTERPRISE`, tier `db-f1-micro`, sin redes autorizadas externas y con conexión exclusiva mediante IAM/socket.
-4. **Gestión de Secretos:** Instancias de Secret Manager para `picanteria-database-url` y `picanteria-admin-password`, inyectadas como variables de entorno seguras en Cloud Run.
-5. **Identidad y Accesos:** Cuenta de servicio dedicada (`picanteria-run`) con roles `roles/cloudsql.client` y `roles/secretmanager.secretAccessor`, y membresías IAM públicas (`allUsers` con `roles/run.invoker`).
+#### 5.6.1 Procedimiento Seguido
+1. **Preparación a cargo de personas:** Un integrante construyó las dos imágenes de la aplicación (`picanteria-api:v1` y `picanteria-web:v1`) con `docker build` y las publicó con `docker push` en el repositorio `apps` de Artifact Registry. El agente no construye ni publica imágenes; la guía de la interfaz y el script `scripts/publicar-imagenes.ps1` se agregaron después para facilitar ese paso.
+2. **Requerimiento:** La persona escribió en el chat, en lenguaje simple, que quería publicar su aplicación en internet y adjuntó la carpeta del proyecto. La ficha técnica (dos componentes, sus puertos, sus variables de entorno y la base de datos PostgreSQL) se obtuvo de esa carpeta sin usar el LLM.
+3. **Especificación:** El agente propuso una base de datos, tres secretos, dos cuentas de servicio y dos servicios de Cloud Run. La persona la aprobó sin cambios.
+4. **Generación y validación:** El código superó todos los controles en el primer intento, incluido `plan` con la cuenta Viewer, con 0 reparaciones y 13 hallazgos informativos de Checkov. La corrida tardó 71.2 s (27.4 s de análisis, 32.1 s de generación y 11.7 s de validación) y costó 0.0354 USD de LLM (6 530 tokens de entrada y 8 142 de salida).
+5. **Plan de despliegue y aprobación:** La persona escribió en el formulario las dos contraseñas que el código declara sin valor por defecto (la del usuario de la base de datos y la inicial del administrador). El agente calculó el plan guardado con la cuenta de despliegue (17 recursos por crear, ninguno fuera del catálogo y ninguna acción destructiva) y la persona lo aprobó escribiendo el ID del proyecto.
+6. **Aplicación y verificación:** El agente ejecutó `apply` sobre el plan aprobado y, al terminar, hizo la prueba HTTP a la salida `service_url`.
+
+#### 5.6.2 Arquitectura Desplegada
+El código generado declara 17 recursos:
+1. **Frontend web:** Servicio de Cloud Run v2 `web`, con la imagen de Nginx que sirve la aplicación de página única, en el puerto 8080 y con 0 a 2 instancias. Reenvía las rutas `/api/` y `/socket.io/` a la API mediante la variable `API_URL`, que el código toma de la URL del servicio `api`.
+2. **API:** Servicio de Cloud Run v2 `api` (NestJS con Prisma), en el puerto 3000 y con 0 a 2 instancias, con el conector de Cloud SQL montado en `/cloudsql`. Recibe `DATABASE_URL` e `INITIAL_ADMIN_PASSWORD` desde Secret Manager.
+3. **Base de datos:** Instancia de Cloud SQL `picanteria-db` (PostgreSQL 17, edición `ENTERPRISE`, tier `db-f1-micro`), con IP pública sin redes autorizadas, de modo que solo se accede por el conector. Incluye la base de datos y el usuario `picanteria`.
+4. **Secretos:** `secret-db-password`, `secret-database-url` y `secret-admin-password` en Secret Manager, cada uno con una versión. La cadena de conexión se arma dentro del código, con `urlencode` sobre la contraseña, por lo que no se pide como variable.
+5. **Identidad y accesos:** Cuenta de servicio `sa-api` con `roles/cloudsql.client` y `roles/secretmanager.secretAccessor` en el proyecto, cuenta de servicio `sa-web` sin roles, y `roles/run.invoker` para `allUsers` en los dos servicios.
 
 ```mermaid
 graph LR
-    subgraph Internet Pública
-        Usuario(("👤 Clientes / Mozos"))
+    Usuario(("Clientes y personal")) -->|HTTPS| Web
+
+    subgraph GCP["Google Cloud Platform: proyecto agente-iac-pm, southamerica-west1"]
+        subgraph CR["Cloud Run v2"]
+            Web["web (Nginx, puerto 8080)<br>SPA y proxy de /api/ y /socket.io/"]
+            API["api (NestJS, puerto 3000)<br>conector en /cloudsql"]
+        end
+        DB[("Cloud SQL PostgreSQL 17<br>picanteria-db, db-f1-micro<br>IP pública sin redes autorizadas")]
+        SM["Secret Manager<br>secret-db-password<br>secret-database-url<br>secret-admin-password"]
+        SAAPI["Cuenta de servicio sa-api<br>cloudsql.client y secretAccessor"]
+        SAWEB["Cuenta de servicio sa-web<br>sin roles"]
     end
 
-    subgraph Google Cloud Platform - southamerica-west1
-        subgraph Cloud Run v2
-            Web["picanteria-web (Nginx:8080)<br>SPA + Proxy Reverso HTTPS"]
-            API["picanteria-api (NestJS:3000)<br>Socket /cloudsql"]
-        end
-
-        subgraph Almacenamiento y Seguridad
-            DB[("Cloud SQL PostgreSQL 17<br>picanteria-db-1107<br>db-f1-micro")]
-            SM["Secret Manager<br>DATABASE_URL<br>ADMIN_PASSWORD"]
-            SA["Service Account<br>picanteria-run"]
-        end
-    end
-
-    Usuario -->|HTTPS / GET 200| Web
-    Web -->|HTTPS /api/ y /socket.io/| API
-    API -->|Conector Socket Unix| DB
-    API -.->|Lee secretos| SM
-    SA -.->|Autoriza acceso| API
+    Web -->|HTTPS, API_URL| API
+    API -->|Conector de Cloud SQL| DB
+    API -.->|Lee DATABASE_URL e INITIAL_ADMIN_PASSWORD| SM
+    SAAPI -.->|Identidad| API
+    SAWEB -.->|Identidad| Web
 ```
 
-#### 5.6.2 Tiempos y Métricas de Ejecución
-- **Fase de Planificación (`terraform plan`):** 38.4 s (14 recursos por crear identificados).
-- **Aprobación Humana de Seguridad:** Verificación visual del plan y confirmación interactiva mediante tipeo del ID del proyecto (`proyecto-gesiti-iac`).
-- **Fase de Aplicación (`terraform apply`):** 342.1 s (~5.7 minutos, dominado por el aprovisionamiento de la instancia Cloud SQL que requirió 4 min 52 s).
-- **Prueba de Verificación HTTP:** Realizada automáticamente contra la salida `service_url` (`https://picanteria-web-e7f2b1c409a8-tl.a.run.app`). Resultado: **HTTP 200 OK en el primer intento**, con una latencia de 142 ms.
-- **Trazabilidad:** Código `.tf`, salidas de consola y logs completos preservados en `docs/evidencia_despliegue/REAL-01/T1-e7f2b1c409a8/evidencia/` y en el Anexo B.
+*Figura 5.1: Topología de servicios en Google Cloud Platform desplegada por el agente para el caso real (Picantería Digital).*
 
-#### 5.6.3 Desglose de Facturación y Costos de Infraestructura en GCP
-La Tabla 5.9 resume el consumo económico real generado durante la sesión de despliegue y validación del caso real en Google Cloud Platform.
+#### 5.6.3 Ejecución del Despliegue
+El despliegue necesitó dos intentos de `apply`, cada uno con su plan y su aprobación.
 
-#### Tabla 5.9: Desglose de Costos de Infraestructura y LLM para el Caso Real (REAL-01)
-| Servicio de GCP / Componente | Dimensionamiento / Recursos | Tarifa Estimada Oficial GCP | Costo Facturado Sesión (~45 min) |
-| :--- | :--- | :---: | :---: |
-| **Cloud Run v2 (API y Web)** | 2 servicios (máx. 1 instancia por servicio) | $0.000048 USD/hora | $0.000036 USD |
-| **Cloud SQL PostgreSQL 17** | 1 instancia `db-f1-micro` Enterprise + 10 GB SSD | $0.015200 USD/hora | $0.011400 USD |
-| **Secret Manager** | 2 secretos con 1 versión activa c/u | $0.06 USD/secreto/mes | $0.000012 USD |
-| **Artifact Registry** | Almacenamiento de 2 imágenes de contenedor (~320 MB) | $0.10 USD/GB/mes | $0.000033 USD |
-| **Tráfico de Red Egress** | Peticiones HTTP y socket interno | Nivel gratuito (< 1 GB) | $0.000000 USD |
-| **Gemini 3.8 Flash (LLM)** | Inferencia (analizar, generar y 1 reparación) | $0.075 / 1M in, $0.30 / 1M out | $0.013200 USD |
-| **TOTAL FACTURADO SESIÓN** | **Infraestructura Completa + Inferencia IA** | — | **$0.024681 USD** |
+#### Tabla 5.9: Intentos de despliegue del caso real
+| Intento | Plan | Duración de `plan` | Duración de `apply` | Resultado |
+| :---: | :--- | :---: | :---: | :--- |
+| 1 | 17 recursos por crear | 2.97 s | 330.85 s | Se detuvo al crear el servicio `api` con *Error 403: Permission 'artifactregistry.repositories.downloadArtifacts' denied*. Quedaron creados 13 recursos; la instancia de Cloud SQL tardó 5 min 21 s. |
+| 2 | 4 recursos por crear y 13 sin cambios | 6.53 s | 58.89 s | Desplegado. El servicio `api` se creó en 42 s y `web` en 11 s. Prueba HTTP a `service_url`: código 200 en 513 ms, en el primer intento. |
 
-> **Nota sobre facturación:** La consola de Google Cloud Billing reporta el consumo de Cloud SQL con un rezago estándar de entre 4 y 8 horas. El valor reportado en la Tabla 5.9 combina el registro de telemetría de APIs consumidas con el cálculo exacto de la tarifa por segundo prorrateada de Google Cloud para la región de Santiago (`southamerica-west1`).
+La causa de la falla fue de preparación del proyecto y no del código generado: la cuenta de despliegue no tenía el rol `roles/artifactregistry.reader` sobre el repositorio de imágenes, y Cloud Run comprueba, al crear un servicio, que quien despliega pueda leer la imagen. El plan se había calculado sin errores con la cuenta Viewer y con la cuenta de despliegue, porque `plan` no verifica ese permiso. El dueño del proyecto otorgó el rol, se conservaron los recursos ya creados y el segundo intento completó el despliegue sobre el mismo estado, con el mismo código y con una nueva aprobación. El permiso quedó documentado en el `README.md` del repositorio.
+
+El tiempo de máquina sumó 471 s, cerca de 8 minutos: 71.2 s de generación y validación, 9.5 s de los dos planes de despliegue, 389.7 s de los dos `apply` y 0.5 s de la prueba HTTP. Esa suma no incluye la revisión de la especificación, las aprobaciones ni la corrección del permiso, que hicieron personas.
+
+Después del despliegue se comprobó, desde un equipo fuera del sandbox, que la web (`https://web-y2zz3fattq-tl.a.run.app`) y su ruta `/ingresar` responden con código 200, y que `/api/auth/me` responde 401 con el mensaje propio de la aplicación a través de la web, lo que indica que la API arrancó, aplicó las migraciones y está conectada a la base de datos. Un integrante inició sesión con el usuario administrador. Los recursos se conservaron para la presentación y se destruirán después con el comando `destruir`.
+
+#### 5.6.4 Costo
+El costo de LLM del caso fue de 0.0354 USD, calculado por LiteLLM con la tarifa del modelo (0.75 USD por millón de tokens de entrada y 3.75 USD por millón de tokens de salida). El costo de infraestructura en GCP no se reporta como cifra cerrada, porque los recursos siguen activos y la facturación se consolida con varias horas de retraso; el proyecto usa el crédito de la prueba gratuita de Google Cloud.
 
 ---
 
@@ -497,7 +519,7 @@ La Tabla 5.10 muestra que, en estos tres escenarios, el agente produjo código v
 
 ### 5.8 EVALUACIÓN DE SEGURIDAD DEL SANDBOX: PRUEBAS S1 A S8
 
-La contención del entorno de ejecución se evaluó con 8 pruebas de seguridad (S1 a S8). Siete están automatizadas en pytest y se ejecutan dentro del contenedor del sandbox con Terraform, TFLint y Checkov reales (`docker compose run --rm pruebas`): las 130 pruebas de la suite pasaron sobre el código entregado (commit `b0aa708`, que suma al código del experimento el ingreso de contraseñas del modo despliegue), y las 110 del piloto pasaron sobre `4a78d23`. S6 cuenta además con un script de evidencia de 10 comprobaciones, y S5 se ejecuta aparte contra el proyecto de GCP, porque requiere las credenciales. La Tabla 5.11 resume el resultado y el mecanismo de cada control; la evidencia está en `docs/evidencia_seguridad/`.
+La contención del entorno de ejecución se evaluó con 8 pruebas de seguridad (S1 a S8). Siete están automatizadas en pytest y se ejecutan dentro del contenedor del sandbox con Terraform, TFLint y Checkov reales (`docker compose run --rm pruebas`): 165 pruebas pasaron y 1 se omitió sobre el código entregado (commit `3d0bcce`, que suma al código del experimento el despliegue desde el chat y la lectura de la carpeta de la aplicación; `pytest-contenedor-main.txt`), 130 pasaron y 1 se omitió sobre `b0aa708`, y las 110 del piloto pasaron sobre `4a78d23`. S6 cuenta además con un script de evidencia de 10 comprobaciones, y S5 se ejecuta aparte contra el proyecto de GCP, porque requiere las credenciales. La Tabla 5.11 resume el resultado y el mecanismo de cada control; la evidencia está en `docs/evidencia_seguridad/`.
 
 #### Tabla 5.11: Resultados de la Batería de Pruebas de Seguridad del Sandbox (S1 a S8)
 | ID Control | Propósito y Amenaza Mitigada | Mecanismo de Defensa Implementado | Resultado de Prueba | Evidencia Asociada |
@@ -523,6 +545,8 @@ Los resultados del experimento no confirman que el bucle de validación y repara
 
 El aporte medible de T1 está en la completitud del código y en el cumplimiento de reglas que el modelo no respeta por sí solo. T1 incluyó todos los tipos de recurso esperados en las 36 corridas, mientras que T0 no alcanzó la cobertura completa en 6 de los 12 escenarios. El piloto mostró además un riesgo propio de los agentes que se reparan guiados por un validador: cuando el control fallaba por falta de valores, el bucle lo superó escribiendo contraseñas en el código. La regla agregada a la revisión estática corrigió ese comportamiento en el experimento, donde 7 corridas se repararon por esa causa, lo que indica que los controles deben cubrir también las reglas de seguridad que establece el propio prompt y no solo la validez del código. Estos beneficios tienen un costo: T1 tarda en promedio 23 s más y gasta el doble por corrida, aunque el costo absoluto se mantiene por debajo de 0.04 USD.
 
+El caso real aporta dos observaciones que el experimento no podía mostrar. La primera es que un plan válido no garantiza que el `apply` termine: el código generado superó todos los controles y el plan se calculó sin errores con las dos cuentas, pero el primer `apply` se detuvo porque la cuenta de despliegue no tenía permiso de lectura sobre el repositorio de imágenes, una condición del proyecto que Terraform solo descubre al crear el servicio. La falla no exigió cambiar el código, y el diseño del modo despliegue (estado conservado, nuevo plan y nueva aprobación) permitió completar el despliegue sin recrear los 13 recursos ya creados. La segunda es que la información que una persona sin formación técnica no sabe expresar (puertos, variables de entorno y forma de conexión a la base de datos) puede obtenerse de la carpeta de la aplicación con un analizador determinista; con esa ficha, el modelo generó en el primer intento un código que, una vez aplicado, dejó la aplicación funcionando. Al tratarse de un solo caso, ambas observaciones son indicios y no resultados generalizables.
+
 ---
 
 ### 6.2 CONCLUSIONES ESPECÍFICAS (C1 A C4)
@@ -536,8 +560,10 @@ Con el modelo evaluado, el grounding y el bucle de validación de T1 no aumentar
 #### Conclusión C3: Reducción Sistemática de Defectos y Dinámica de Convergencia (Gabriel Llerena)
 El bucle de reparación intervino en 9 de las 36 corridas de T1, y todas convergieron en la primera reparación: 7 por variables sensibles con valor por defecto, rechazadas por la revisión estática, y 2 por un argumento inexistente detectado por `validate`. El piloto mostró que, cuando el entorno de validación tiene un defecto, el bucle puede superar el control a costa de una regla de seguridad (24 corridas terminaron con contraseñas en el código), por lo que el diseño de los controles resulta tan importante como el ciclo de reparación. El costo del ciclo es significativo en términos relativos (23 s y 0.016 USD adicionales por corrida, con $p < 0.01$ tras el ajuste de Holm), pero pequeño en términos absolutos.
 
-#### Conclusión C4: Viabilidad Económica, Eficiencia Temporal y Transferibilidad a Producción (Paolo Ramírez)
-La comparación entre la medición manual cronometrada y el agente (T1) en tres escenarios, uno por nivel, mostró que el agente reduce el tiempo de elaboración del código en un **98.7 %** (de 3.25 horas a 2.6 minutos, sin contar la revisión humana) y el costo directo en un **99.95 %**, con menos de nueve centavos de dólar (0.087 USD) en tokens frente a 179 USD en horas de ingeniería. Por tratarse de una sola persona y de tres escenarios, el ahorro es una estimación y no un resultado generalizable. Además, el despliegue exitoso en Google Cloud Platform de la aplicación *Picantería Digital* (API NestJS, Web Nginx, PostgreSQL 17 y Secret Manager en `southamerica-west1`) valida la capacidad del agente para transferir de manera segura y precisa requerimientos complejos hacia entornos productivos reales bajo supervisión humana estricta.
+#### Conclusión C4: Viabilidad Económica, Eficiencia Temporal y Transferibilidad a un Entorno Real (Paolo Ramírez)
+La comparación entre la medición manual cronometrada y el agente (T1) en tres escenarios, uno por nivel, mostró que el agente reduce el tiempo de elaboración del código en un **98.7 %** (de 3.25 horas a 2.6 minutos, sin contar la revisión humana) y el costo directo en un **99.95 %**, con menos de nueve centavos de dólar (0.087 USD) en tokens frente a 179 USD en horas de ingeniería. Por tratarse de una sola persona y de tres escenarios, el ahorro es una estimación y no un resultado generalizable.
+
+En cuanto a la transferencia a un entorno real, el agente desplegó desde la interfaz de chat la aplicación *Picantería Digital* (dos servicios de Cloud Run, Cloud SQL PostgreSQL 17 y Secret Manager en `southamerica-west1`) a partir de un requerimiento en lenguaje simple y de la carpeta de la aplicación. El código se generó sin reparaciones, con un costo de LLM de 0.035 USD, y el plan de 17 recursos se aplicó con aprobación humana en dos intentos, porque el primero se detuvo por un permiso que le faltaba a la cuenta de despliegue sobre el repositorio de imágenes. La aplicación respondió con código 200 en la primera verificación HTTP. El resultado muestra que el flujo es viable bajo supervisión humana, pero corresponde a un único caso y dependió de pasos manuales previos: la publicación de las imágenes y los permisos del proyecto.
 
 ---
 
@@ -548,6 +574,12 @@ La comparación entre la medición manual cronometrada y el agente (T1) en tres 
 4. **Efecto techo en la línea base:** Con el modelo evaluado, T0 supera `validate` y `plan` en el 97.2 % de las corridas, lo que limita la capacidad del experimento para detectar diferencias en esas tasas. Escenarios más exigentes o un modelo menos capaz podrían mostrar una relación distinta.
 5. **Valores de relleno en `plan`:** En modo evaluación, las variables sin valor por defecto reciben un valor de relleno. El plan verifica la estructura del código y sus referencias, pero no que los valores reales que se usarán al desplegar sean válidos para cada servicio.
 6. **Tamaño de la muestra:** Doce escenarios con tres repeticiones por tratamiento permiten detectar diferencias grandes, pero no efectos pequeños, como la diferencia de cobertura observada.
+7. **Un solo caso real:** El despliegue se hizo una vez, con una aplicación y en un proyecto. No permite estimar una tasa de éxito de despliegue ni generalizar a otras aplicaciones.
+8. **Funciones posteriores al experimento:** El despliegue desde el chat, la lectura de la carpeta de la aplicación y la guía de publicación de imágenes se agregaron después de la etiqueta `v1.1-experimento`. No forman parte del contraste de hipótesis y solo se probaron con el caso real y con pruebas automatizadas.
+9. **Validez no equivale a funcionalidad:** Los controles verifican que el código sea válido y que el plan se pueda calcular, no que la aplicación funcione. Sin la ficha de la carpeta, un requerimiento en lenguaje simple puede producir un código válido que no referencia las imágenes reales o que no conecta la API con la base de datos. La única comprobación funcional es la prueba HTTP posterior al despliegue.
+10. **Condiciones del proyecto que `plan` no detecta:** El primer `apply` del caso real falló por un permiso de la cuenta de despliegue sobre el repositorio de imágenes, pese a que el plan se había calculado sin errores. El agente no comprueba de antemano esos permisos ni la existencia de las imágenes.
+11. **Pasos manuales:** El agente no construye ni publica las imágenes de contenedor, ni prepara el proyecto (APIs habilitadas, cuentas de servicio y permisos). La ficha de la carpeta incluye además indicaciones fijas para el patrón de Cloud Run con Cloud SQL, por lo que su utilidad en aplicaciones con otra forma no se evaluó.
+12. **Postura de seguridad del caso desplegado:** La configuración desplegada sirve como demostración y no está endurecida para producción. La API es invocable públicamente, la base de datos tiene IP pública (sin redes autorizadas), la cuenta de la API recibe sus roles a nivel de proyecto y Checkov reportó 13 hallazgos informativos. La cuenta de despliegue requiere roles amplios, entre ellos `roles/resourcemanager.projectIamAdmin`.
 
 ---
 
@@ -555,6 +587,9 @@ La comparación entre la medición manual cronometrada y el agente (T1) en tres 
 1. **Extensión Multicloud:** Ampliar el catálogo y los esquemas hacia AWS (`hashicorp/aws`) y Azure (`hashicorp/azurerm`), evaluando la capacidad del agente para traducir especificaciones arquitectónicas neutrales entre diferentes nubes.
 2. **Integración con Grafos de Costo Predictivo (Infracost):** Incorporar en el bucle de validación un control estático que estime el presupuesto mensual proyectado del código generado antes de someterlo a aprobación humana.
 3. **Mecanismos de Aprendizaje en Contexto a Partir de Trazas:** Almacenar las trazas de errores y soluciones exitosas en una base de datos vectorial para alimentar ejemplos dinámicos de *few-shot prompting* en tareas complejas de reparación.
+4. **Comprobaciones previas al despliegue:** Verificar, antes de pedir la aprobación, que la cuenta de despliegue tenga los permisos que el plan necesita y que las imágenes referenciadas existan, para que las fallas de preparación aparezcan antes del `apply`.
+5. **Construcción y publicación de imágenes dentro del flujo:** Incorporar la construcción de las imágenes en un entorno confinado, de modo que la persona no tenga que ejecutar comandos en su equipo.
+6. **Evaluación con usuarios y más casos reales:** Medir, con personas sin formación técnica y con aplicaciones de distinta forma, cuántos requerimientos llegan a una aplicación funcionando, y endurecer la configuración generada (base de datos sin IP pública y permisos por recurso).
 
 ---
 
@@ -563,13 +598,13 @@ La comparación entre la medición manual cronometrada y el agente (T1) en tres 
 - [1] K. Morris, *Infrastructure as Code: Dynamic Systems for the Cloud Age*, 2nd ed. Sebastopol, CA: O'Reilly Media, 2020.
 - [2] HashiCorp, "Terraform Documentation and Google Cloud Provider Architecture," HashiCorp Developer Documentation, 2026. [En línea]. Disponible en: https://developer.hashicorp.com/terraform
 - [3] Center for Internet Security (CIS), "CIS Google Cloud Platform Foundation Benchmark v3.0.0," CIS Security Benchmarks, 2024.
-- [4] X. Hou, Y. Zhao, Y. Liu, Z. Yang, K. Wang, and L. Li, "Large Language Models for Infrastructure-as-Code: An Empirical Study on Code Generation and Repair," in *Proceedings of the 46th International Conference on Software Engineering (ICSE)*, 2024, pp. 112–124.
-- [5] A. Martínez, P. Gómez, and F. Silva, "Evaluating Security Vulnerabilities and Code Smells in LLM-Generated Terraform Manifests," *IEEE Transactions on Cloud Computing*, vol. 12, no. 3, pp. 845–858, 2024.
-- [6] S. Callocondo, P. Mejía, G. Llerena, and P. Ramírez, "Treat LLM-Generated Terraform as Untrusted: A Hardened Sandboxing Approach," *arXiv preprint arXiv:2411.08921*, 2026.
+- [4] P. T. J. Kon, J. Liu, Y. Qiu, W. Fan, T. He, L. Lin, H. Zhang, O. M. Park, G. S. Elengikal, Y. Kang, A. Chen, M. Chowdhury, M. Lee, and X. Wang, "IaC-Eval: A Code Generation Benchmark for Cloud Infrastructure-as-Code Programs," in *Advances in Neural Information Processing Systems 37 (NeurIPS 2024), Datasets and Benchmarks Track*, 2024.
+- [5] A. Rahman, C. Parnin, and L. Williams, "The Seven Sins: Security Smells in Infrastructure as Code Scripts," in *Proceedings of the 41st IEEE/ACM International Conference on Software Engineering (ICSE)*, 2019, pp. 164–175, doi: 10.1109/ICSE.2019.00033.
+- [6] HashiCorp, "Use provisioners to perform post-apply operations (local-exec)," Terraform Documentation, 2026. [En línea]. Disponible en: [https://developer.hashicorp.com/terraform/language/resources/provisioners/local-exec](https://developer.hashicorp.com/terraform/language/resources/provisioners/local-exec)
 - [7] N. Shinn, F. Cassano, A. Gopinath, K. Narasimhan, and S. Yao, "Reflexion: Language Agents with Verbal Reinforcement Learning," in *Advances in Neural Information Processing Systems (NeurIPS)*, vol. 36, 2023, pp. 8634–8652.
 - [8] X. Chen et al., "Teaching Large Language Models to Self-Debug," in *International Conference on Learning Representations (ICLR)*, 2024.
 - [9] Bridgecrew by Palo Alto Networks, "Checkov: Static Code Analysis for Infrastructure as Code (IaC)," 2026. [En línea]. Disponible en: https://www.checkov.io
-- [10] S. Stuart and P. Mejía, "Defending against Malicious IaC: Sandboxing Terraform Execution Environments," in *Proceedings of the ACM Cloud Security Workshop*, 2025, pp. 45–56.
+- [10] HashiCorp, "external Data Source," Terraform Provider External Documentation, 2026. [En línea]. Disponible en: [https://registry.terraform.io/providers/hashicorp/external/latest/docs/data-sources/external](https://registry.terraform.io/providers/hashicorp/external/latest/docs/data-sources/external)
 - [11] F. Wilcoxon, "Individual Comparisons by Ranking Methods," *Biometrics Bulletin*, vol. 1, no. 6, pp. 80–83, 1945.
 - [12] Q. McNemar, "Note on the sampling error of the difference between correlated proportions or percentages," *Psychometrika*, vol. 12, no. 2, pp. 153–157, 1947.
 - [13] B. Efron and R. J. Tibshirani, *An Introduction to the Bootstrap*. New York: Chapman and Hall/CRC, 1994.
@@ -578,6 +613,7 @@ La comparación entre la medición manual cronometrada y el agente (T1) en tres 
 - [16] I. Sommerville, *Software Engineering*, 10th ed. Boston: Pearson, 2016.
 - [17] Upwork Global Inc., "DevOps Engineer Hourly Rates and Hiring Guide," *Upwork Resource Center*, 2024–2026. [En línea]. Disponible en: https://www.upwork.com/resources/devops-engineer-hourly-rate
 - [18] Indeed Hiring Insights & Salary.com, "Cloud DevOps Engineer Contractor Hourly Rates and Salary Benchmarks in the Americas," *Indeed Economic Research*, 2025–2026. [En línea]. Disponible en: https://www.indeed.com/career/devops-engineer/salaries
+- [19] K. G. Srivatsa, S. Mukhopadhyay, G. Katrapati, and M. Shrivastava, "A Survey of using Large Language Models for Generating Infrastructure as Code," *arXiv preprint arXiv:2404.00227*, 2024.
 
 ---
 
@@ -607,107 +643,161 @@ El banco de pruebas incluye 12 escenarios estructurados en formato YAML dentro d
 
 ## ANEXO B: EVIDENCIA DEL DESPLIEGUE REAL EN GOOGLE CLOUD PLATFORM
 
-A continuación se transcribe la evidencia formal recolectada durante la sesión de despliegue real del caso de uso *Picantería Digital* (`casos/caso_real.yaml`), ejecutado en el proyecto `proyecto-gesiti-iac` en la región `southamerica-west1`.
+Este anexo transcribe extractos de la evidencia del despliegue del caso *Picantería Digital*, hecho el 10 de noviembre de 2026 desde la interfaz de chat en el proyecto `agente-iac-pm`, región `southamerica-west1` (sesión `WEB-20261110-231346`). Los archivos completos, sin editar, están en `docs/evidencia_despliegue/WEB-20261110-231346/`. No se incluye el estado de Terraform, porque contiene secretos.
 
-### B.1 Plan de Ejecución de Terraform (`plan.txt`)
-```hcl
-Terraform used the selected providers to generate the following execution plan.
-Resource actions are indicated with the following symbols:
-  + create
+### B.1 Corrida del Agente (`resultado.json`)
 
-Terraform will perform the following actions:
+| Campo | Valor |
+| :--- | :--- |
+| Sesión e identificador de la corrida | `WEB-20261110-231346`, `a55e30733e32` (tratamiento T1) |
+| Modelo | `gemini/gemini-3.8-flash` |
+| Llamadas al LLM | analizar: 27.4 s, 0.0138 USD; generar: 32.1 s, 0.0217 USD |
+| Controles superados | `guard`, `fmt`, `init`, `validate`, `tflint`, `checkov`, `plan` |
+| Reparaciones | 0 |
+| Hallazgos de Checkov (informativos) | 13 |
+| Tiempo total | 71.2 s |
+| Tokens de entrada y de salida | 6 530 y 8 142 |
+| Costo de LLM | 0.0354 USD |
+| Versiones | Terraform 1.16.7, proveedor google 8.8.1, TFLint 0.65.0, Checkov 3.3.30 |
 
+### B.2 Plan del Primer Intento (`intento-1/plan.txt`, extracto)
+
+Se listan los 17 recursos del plan; el archivo completo incluye los atributos de cada uno.
+
+```text
   # google_cloud_run_v2_service.api will be created
-  + resource "google_cloud_run_v2_service" "api" {
-      + deletion_protection  = false
-      + ingress              = "INGRESS_TRAFFIC_ALL"
-      + location             = "southamerica-west1"
-      + name                 = "picanteria-api"
-      + project              = "proyecto-gesiti-iac"
-      ...
   # google_cloud_run_v2_service.web will be created
-  + resource "google_cloud_run_v2_service" "web" {
-      + deletion_protection  = false
-      + ingress              = "INGRESS_TRAFFIC_ALL"
-      + location             = "southamerica-west1"
-      + name                 = "picanteria-web"
-      ...
+  # google_cloud_run_v2_service_iam_member.api_public will be created
+  # google_cloud_run_v2_service_iam_member.web_public will be created
+  # google_project_iam_member.sa_api_cloudsql will be created
+  # google_project_iam_member.sa_api_secrets will be created
+  # google_secret_manager_secret.admin_password will be created
+  # google_secret_manager_secret.database_url will be created
+  # google_secret_manager_secret.db_password will be created
+  # google_secret_manager_secret_version.admin_password will be created
+  # google_secret_manager_secret_version.database_url will be created
+  # google_secret_manager_secret_version.db_password will be created
+  # google_service_account.sa_api will be created
+  # google_service_account.sa_web will be created
+  # google_sql_database.db will be created
   # google_sql_database_instance.db will be created
-  + resource "google_sql_database_instance" "db" {
-      + database_version    = "POSTGRES_17"
-      + deletion_protection = false
-      + name                = "picanteria-db-1107"
-      + region              = "southamerica-west1"
-      + settings {
-          + edition = "ENTERPRISE"
-          + tier    = "db-f1-micro"
-          + ip_configuration {
-              + ipv4_enabled = true
-            }
-        }
-      ...
-Plan: 14 to add, 0 to change, 0 to destroy.
+  # google_sql_user.user will be created
+
+Plan: 17 to add, 0 to change, 0 to destroy.
 ```
 
-### B.2 Registro de Aplicación (`apply.log`)
-```text
-google_service_account.run: Creating...
-google_secret_manager_secret.database_url: Creating...
-google_secret_manager_secret.admin_password: Creating...
-google_sql_database_instance.db: Creating...
-google_service_account.run: Creation complete after 1s [id=projects/proyecto-gesiti-iac/serviceAccounts/picanteria-run@proyecto-gesiti-iac.iam.gserviceaccount.com]
-google_project_iam_member.secret_accessor: Creation complete after 5s
-google_project_iam_member.sql_client: Creation complete after 6s
-google_secret_manager_secret_version.admin_password: Creation complete after 1s
-google_sql_database_instance.db: Still creating... [4m0s elapsed]
-google_sql_database_instance.db: Creation complete after 4m52s [id=projects/proyecto-gesiti-iac/instances/picanteria-db-1107]
-google_sql_database.picanteria: Creation complete after 1s
-google_sql_user.picanteria: Creation complete after 2s
-google_cloud_run_v2_service.api: Creation complete after 22s [id=projects/proyecto-gesiti-iac/locations/southamerica-west1/services/picanteria-api]
-google_cloud_run_v2_service.web: Creation complete after 15s [id=projects/proyecto-gesiti-iac/locations/southamerica-west1/services/picanteria-web]
-google_cloud_run_v2_service_iam_member.web_publico: Creation complete after 3s
+### B.3 Aplicación del Primer Intento (`intento-1/apply.log`, extracto)
 
-Apply complete! Resources: 14 added, 0 changed, 0 destroyed.
+Se transcriben las líneas de recursos creados y el error que detuvo la aplicación.
+
+```text
+google_secret_manager_secret.admin_password: Creation complete after 3s [id=projects/agente-iac-pm/secrets/secret-admin-password]
+google_secret_manager_secret.database_url: Creation complete after 4s [id=projects/agente-iac-pm/secrets/secret-database-url]
+google_secret_manager_secret.db_password: Creation complete after 4s [id=projects/agente-iac-pm/secrets/secret-db-password]
+google_secret_manager_secret_version.admin_password: Creation complete after 5s [id=projects/236873298120/secrets/secret-admin-password/versions/1]
+google_secret_manager_secret_version.db_password: Creation complete after 4s [id=projects/236873298120/secrets/secret-db-password/versions/1]
+google_service_account.sa_api: Creation complete after 15s [id=projects/agente-iac-pm/serviceAccounts/sa-api@agente-iac-pm.iam.gserviceaccount.com]
+google_service_account.sa_web: Creation complete after 18s [id=projects/agente-iac-pm/serviceAccounts/sa-web@agente-iac-pm.iam.gserviceaccount.com]
+google_project_iam_member.sa_api_secrets: Creation complete after 11s [id=agente-iac-pm/roles/secretmanager.secretAccessor/serviceAccount:sa-api@agente-iac-pm.iam.gserviceaccount.com]
+google_project_iam_member.sa_api_cloudsql: Creation complete after 11s [id=agente-iac-pm/roles/cloudsql.client/serviceAccount:sa-api@agente-iac-pm.iam.gserviceaccount.com]
+google_sql_database_instance.db: Creation complete after 5m21s [id=picanteria-db]
+google_sql_database.db: Creation complete after 2s [id=projects/agente-iac-pm/instances/picanteria-db/databases/picanteria]
+google_sql_user.user: Creation complete after 4s [id=picanteria//picanteria-db]
+google_secret_manager_secret_version.database_url: Creation complete after 3s [id=projects/236873298120/secrets/secret-database-url/versions/1]
+
+Error: Error creating Service: googleapi: Error 403: Permission 'artifactregistry.repositories.downloadArtifacts' denied on resource '//artifactregistry.googleapis.com/projects/agente-iac-pm/locations/southamerica-west1/repositories/apps' (or it may not exist). [...]
+  with google_cloud_run_v2_service.api,
+  on main.tf line 104, in resource "google_cloud_run_v2_service" "api":
+ 104: resource "google_cloud_run_v2_service" "api" {
+```
+
+### B.4 Plan y Aplicación del Segundo Intento (`intento-2/plan.txt` y `intento-2/apply.log`)
+
+```text
+  # google_cloud_run_v2_service.api will be created
+  # google_cloud_run_v2_service.web will be created
+  # google_cloud_run_v2_service_iam_member.api_public will be created
+  # google_cloud_run_v2_service_iam_member.web_public will be created
+
+Plan: 4 to add, 0 to change, 0 to destroy.
+```
+
+```text
+google_cloud_run_v2_service.api: Creating...
+google_cloud_run_v2_service.api: Still creating... [00m10s elapsed]
+google_cloud_run_v2_service.api: Still creating... [00m20s elapsed]
+google_cloud_run_v2_service.api: Still creating... [00m30s elapsed]
+google_cloud_run_v2_service.api: Still creating... [00m40s elapsed]
+google_cloud_run_v2_service.api: Creation complete after 42s [id=projects/agente-iac-pm/locations/southamerica-west1/services/api]
+google_cloud_run_v2_service_iam_member.api_public: Creating...
+google_cloud_run_v2_service.web: Creating...
+google_cloud_run_v2_service_iam_member.api_public: Creation complete after 5s [id=projects/agente-iac-pm/locations/southamerica-west1/services/api/roles/run.invoker/allUsers]
+google_cloud_run_v2_service.web: Still creating... [00m10s elapsed]
+google_cloud_run_v2_service.web: Creation complete after 11s [id=projects/agente-iac-pm/locations/southamerica-west1/services/web]
+google_cloud_run_v2_service_iam_member.web_public: Creating...
+google_cloud_run_v2_service_iam_member.web_public: Creation complete after 5s [id=projects/agente-iac-pm/locations/southamerica-west1/services/web/roles/run.invoker/allUsers]
+
+Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
 
 Outputs:
-api_url = "https://picanteria-api-e7f2b1c409a8-tl.a.run.app"
-service_url = "https://picanteria-web-e7f2b1c409a8-tl.a.run.app"
+
+service_url = "https://web-y2zz3fattq-tl.a.run.app"
 ```
 
-### B.3 Verificación de Disponibilidad HTTP (`http.txt`)
+### B.5 Verificación de Disponibilidad HTTP (`intento-2/http.txt`)
+
 ```json
 {
-  "url": "https://picanteria-web-e7f2b1c409a8-tl.a.run.app",
+  "url": "https://web-y2zz3fattq-tl.a.run.app",
   "codigo": 200,
-  "latencia_ms": 142,
+  "latencia_ms": 513,
   "intentos": 1,
   "ok": true
 }
 ```
 
-### B.4 Resultado Estructurado del Despliegue (`resultado_despliegue.json`)
+### B.6 Resultado Estructurado del Despliegue (`intento-2/resultado_despliegue.json`)
+
+Se omite la lista `cambios`, que repite los recursos del plan.
+
 ```json
 {
   "estado": "desplegado",
-  "motivo": "Recursos conservados. Para destruirlos: python -m agent destruir resultados/despliegue/REAL-01/T1-e7f2b1c409a8/despliegue",
+  "motivo": "Recursos conservados. Para destruirlos: python -m agent destruir resultados/web/WEB-20261110-231346/T1-a55e30733e32/despliegue",
   "aprobado": true,
   "aplicado": true,
   "prueba_http": {
-    "url": "https://picanteria-web-e7f2b1c409a8-tl.a.run.app",
+    "url": "https://web-y2zz3fattq-tl.a.run.app",
     "codigo": 200,
-    "latencia_ms": 142,
+    "latencia_ms": 513,
     "intentos": 1,
     "ok": true
   },
   "destruido": false,
-  "directorio": "resultados/despliegue/REAL-01/T1-e7f2b1c409a8/despliegue",
+  "directorio": "resultados/web/WEB-20261110-231346/T1-a55e30733e32/despliegue",
   "duraciones_s": {
-    "plan": 38.4,
-    "apply": 342.1,
-    "prueba_http": 1.2
+    "plan": 6.53,
+    "apply": 58.89,
+    "prueba_http": 0.51
   }
 }
 ```
+
+### B.7 Capturas de la Sesión (`docs/figuras/capturas/`)
+
+| Archivo | Qué muestra |
+| :--- | :--- |
+| `01-especificacion.png` | Requerimiento en lenguaje simple, ficha leída de la carpeta y especificación propuesta |
+| `02-validacion-y-codigo.png` | Controles superados y código generado |
+| `03-plan-de-despliegue-intento1.png` | Plan de 17 recursos y solicitud de aprobación |
+| `04-aplicando-intento1.png` | Aplicación en curso del primer intento |
+| `05-fallo-del-apply-intento1.png` | Error 403 al crear el servicio `api` |
+| `06-resultado-fallo-apply-intento1.png` | Resultado del primer intento, con los recursos conservados |
+| `03-plan-de-despliegue-intento2.png` | Plan de 4 recursos del segundo intento |
+| `04-aplicando-intento2.png` | Aplicación en curso del segundo intento |
+| `05-desplegado-intento2.png` | Despliegue terminado y prueba HTTP con código 200 |
+| `06-resultado-desplegado-intento2.png` | Resultado final de la sesión |
+| `07-aplicacion-desplegada.png` | Pantalla de ingreso de la aplicación desplegada |
 
 ---
 
@@ -771,6 +861,8 @@ Todos los archivos manuales fueron verificados con `sandbox/guard.py` superando 
 - **Etiqueta de Congelamiento Experimental:** `v1.1-experimento` (commit `0bc4930`), código con el que se ejecutó el experimento (`lote-v2`).
 - **Etiqueta del Piloto:** `v1.0-piloto` (commit `4a78d23`), código del lote piloto (`lote-v1`) descrito en la sección 5.1.
 - **Datos y análisis:** `docs/experimento/lote-v2/` (experimento) y `docs/experimento/lote-v1/` (piloto).
+- **Código entregado:** rama `main`. El caso real de la sección 5.6 se desplegó con el código del commit `fe9ca4e`, que agrega al código del experimento el despliegue desde el chat y la lectura de la carpeta de la aplicación.
+- **Evidencia del caso real:** `docs/evidencia_despliegue/WEB-20261110-231346/` y `docs/figuras/capturas/`.
 
 ### Pasos de Reproducción Rápida:
 ```bash
@@ -800,6 +892,10 @@ docker compose run --rm --entrypoint python agente -m eval.analysis resultados/l
 # 7. Lanzar la interfaz web interactiva
 docker compose up -d web-puente
 # Abrir en el navegador: http://127.0.0.1:8787
+
+# 8. Interfaz web con despliegue (requiere GCP_CUENTA_DESPLIEGUE en .env; solo desde la rama main)
+docker compose up -d web-puente-despliegue
+# Abrir en el navegador: http://127.0.0.1:8788
 ```
 
 ---

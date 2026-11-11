@@ -1,0 +1,13 @@
+---
+config:
+  themeVariables:
+    fontSize: 22px
+---
+graph TD
+    P["Pedido en lenguaje simple"] --> A["Paso 1: Analizar<br>propone la especificación"]
+    A --> PL["Paso 2: Planificar<br>sin IA"]
+    PL --> G["Paso 3: Generar<br>escribe el Terraform"]
+    G --> V["Paso 4: Validar<br>7 controles"]
+    V -->|pasa| R["Código validado"]
+    V -->|falla| RE["Paso 5: Reparar<br>hasta 5 veces"]
+    RE --> V

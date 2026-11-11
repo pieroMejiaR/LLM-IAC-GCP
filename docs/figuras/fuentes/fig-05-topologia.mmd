@@ -1,0 +1,9 @@
+graph TD
+    U(("Clientes y personal")) -->|HTTPS| W
+    subgraph GCP["Proyecto agente-iac-pm (southamerica-west1)"]
+        W["Cloud Run: web<br>Nginx, puerto 8080"] -->|"/api/ y /socket.io/"| A["Cloud Run: api<br>NestJS, puerto 3000"]
+        A -->|conector de Cloud SQL| D[("Cloud SQL<br>PostgreSQL 17<br>db-f1-micro")]
+        A -.->|lee contraseñas| S["Secret Manager<br>3 secretos"]
+        SW["Cuenta sa-web<br>sin roles"] -.-> W
+        SA["Cuenta sa-api<br>cloudsql.client y<br>secretAccessor"] -.-> A
+    end

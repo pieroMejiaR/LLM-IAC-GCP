@@ -8,7 +8,8 @@ editar. No se incluye el estado de Terraform, que contiene secretos.
 
 1. La persona escribió el requerimiento en lenguaje simple y adjuntó la carpeta de la aplicación
    (`picanteria-digital`). La ficha técnica se leyó de esa carpeta (`agent/proyecto.py`).
-2. El agente propuso la especificación (7 piezas), que se aprobó sin cambios (revisión A).
+2. El agente propuso la especificación (8 piezas: una base de datos, tres secretos, dos cuentas de servicio
+   y dos servicios de Cloud Run), que se aprobó sin cambios (revisión A).
 3. Generó el Terraform, que pasó todos los controles en el primer intento, incluido `plan` con la cuenta
    Viewer: 0 reparaciones, 13 hallazgos de Checkov informativos, 71,2 s y 0,0354 USD de LLM (`resultado.json`).
 4. Con las dos contraseñas escritas por la persona, calculó el plan con la cuenta `agente-deploy`:

@@ -1,0 +1,9 @@
+graph TD
+    subgraph N["Niveles de complejidad"]
+        A["Nivel básico<br>(4 escenarios)<br>1 a 2 servicios de GCP"]
+        B["Nivel intermedio<br>(5 escenarios)<br>3 a 4 servicios de GCP"]
+        C["Nivel avanzado<br>(3 escenarios)<br>5 a 6 servicios de GCP"]
+    end
+    A --> D["Almacenamiento estático, APIs serverless,<br>secretos e IAM"]
+    B --> E["Redes VPC, Cloud SQL privado,<br>Cloud Run y Storage"]
+    C --> F["Arquitecturas multicapa, secretos,<br>firewalls y almacenamiento aislado"]
